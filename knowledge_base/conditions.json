@@ -1,0 +1,106 @@
+{
+  "conditions": [
+    {
+      "id": "common_cold",
+      "name": "Common Cold",
+      "symptoms": ["runny nose", "sore throat", "cough", "congestion", "sneezing", "mild fever", "fatigue"],
+      "category": "Infectious"
+    },
+    {
+      "id": "flu",
+      "name": "Influenza (Flu)",
+      "symptoms": ["high fever", "body aches", "chills", "fatigue", "cough", "sore throat", "headache", "runny nose"],
+      "category": "Infectious"
+    },
+    {
+      "id": "allergic_rhinitis",
+      "name": "Allergic Rhinitis (Hay Fever)",
+      "symptoms": ["sneezing", "runny nose", "itchy eyes", "congestion", "itchy throat", "watery eyes"],
+      "category": "Allergy"
+    },
+    {
+      "id": "migraine",
+      "name": "Migraine",
+      "symptoms": ["severe headache", "nausea", "sensitivity to light", "sensitivity to sound", "vomiting", "aura"],
+      "category": "Neurological"
+    },
+    {
+      "id": "tension_headache",
+      "name": "Tension Headache",
+      "symptoms": ["headache", "pressure around forehead", "neck pain", "tightness in head"],
+      "category": "Neurological"
+    },
+    {
+      "id": "gastroenteritis",
+      "name": "Gastroenteritis (Stomach Flu)",
+      "symptoms": ["diarrhea", "nausea", "vomiting", "stomach cramps", "fever", "dehydration"],
+      "category": "Digestive"
+    },
+    {
+      "id": "gerd",
+      "name": "GERD (Acid Reflux)",
+      "symptoms": ["heartburn", "chest pain", "regurgitation", "difficulty swallowing", "chronic cough", "sore throat"],
+      "category": "Digestive"
+    },
+    {
+      "id": "asthma",
+      "name": "Asthma",
+      "symptoms": ["wheezing", "shortness of breath", "chest tightness", "cough", "difficulty breathing"],
+      "category": "Respiratory"
+    },
+    {
+      "id": "bronchitis",
+      "name": "Acute Bronchitis",
+      "symptoms": ["cough", "mucus production", "fatigue", "shortness of breath", "chest discomfort", "mild fever"],
+      "category": "Respiratory"
+    },
+    {
+      "id": "anxiety",
+      "name": "Anxiety Disorder",
+      "symptoms": ["worry", "restlessness", "fatigue", "difficulty concentrating", "irritability", "muscle tension", "sleep problems"],
+      "category": "Mental Health"
+    },
+    {
+      "id": "depression",
+      "name": "Depression",
+      "symptoms": ["sadness", "loss of interest", "fatigue", "sleep changes", "appetite changes", "concentration difficulty", "hopelessness"],
+      "category": "Mental Health"
+    },
+    {
+      "id": "uti",
+      "name": "Urinary Tract Infection (UTI)",
+      "symptoms": ["painful urination", "frequent urination", "urgency", "lower abdominal pain", "cloudy urine", "pelvic pain"],
+      "category": "Urinary"
+    },
+    {
+      "id": "hypertension",
+      "name": "Hypertension (High Blood Pressure)",
+      "symptoms": ["headaches", "dizziness", "blurred vision", "chest pain", "shortness of breath", "often asymptomatic"],
+      "category": "Cardiovascular"
+    },
+    {
+      "id": "type2_diabetes",
+      "name": "Type 2 Diabetes",
+      "symptoms": ["increased thirst", "frequent urination", "fatigue", "blurred vision", "slow healing", "increased hunger", "weight changes"],
+      "category": "Endocrine"
+    },
+    {
+      "id": "anemia",
+      "name": "Anemia",
+      "symptoms": ["fatigue", "weakness", "pale skin", "shortness of breath", "dizziness", "cold hands and feet", "irregular heartbeat"],
+      "category": "Blood"
+    },
+    {
+      "id": "arthritis",
+      "name": "Osteoarthritis",
+      "symptoms": ["joint pain", "stiffness", "swelling", "reduced range of motion", "joint tenderness"],
+      "category": "Musculoskeletal"
+    },
+    {
+      "id": "eczema",
+      "name": "Eczema (Atopic Dermatitis)",
+      "symptoms": ["itchy skin", "red patches", "dry skin", "rash", "skin cracking", "swelling"],
+      "category": "Skin"
+    }
+  ]
+}

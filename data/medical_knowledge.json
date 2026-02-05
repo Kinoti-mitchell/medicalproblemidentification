@@ -1,0 +1,121 @@
+{
+  "diseases": [
+    {
+      "id": "common_cold",
+      "name": "Common Cold",
+      "description": "A viral infection of the upper respiratory tract (nose and throat). Usually harmless and self-limiting; most people recover within 7–10 days.",
+      "symptoms": ["runny nose", "sore throat", "cough", "congestion", "sneezing", "mild fever", "fatigue"],
+      "diagnostics": ["Clinical examination", "Symptom assessment", "Rapid flu test (to rule out influenza)"],
+      "treatment": ["Rest", "Fluids", "Over-the-counter pain/fever relievers", "Decongestants or antihistamines as needed"],
+      "references": "CDC Common Cold. NIH MedlinePlus. For educational use only."
+    },
+    {
+      "id": "influenza",
+      "name": "Influenza (Flu)",
+      "description": "Contagious respiratory illness caused by influenza viruses. Can cause mild to severe illness; high-risk groups may develop complications.",
+      "symptoms": ["high fever", "body aches", "chills", "fatigue", "cough", "sore throat", "headache", "runny nose"],
+      "diagnostics": ["Rapid influenza diagnostic test (RIDT)", "Molecular assays (e.g. PCR)", "Viral culture"],
+      "treatment": ["Rest", "Fluids", "Antivirals (e.g. oseltamivir) if indicated and early", "Symptomatic relief for fever and pain"],
+      "references": "CDC Influenza. WHO Flu. For educational use only."
+    },
+    {
+      "id": "allergic_rhinitis",
+      "name": "Allergic Rhinitis (Hay Fever)",
+      "description": "Inflammation of the nasal lining due to allergens (pollen, dust mites, pet dander). Seasonal or perennial.",
+      "symptoms": ["sneezing", "runny nose", "itchy eyes", "congestion", "itchy throat", "watery eyes"],
+      "diagnostics": ["Clinical history", "Skin prick test", "Specific IgE blood test", "Nasal smear for eosinophils"],
+      "treatment": ["Allergen avoidance", "Intranasal corticosteroids", "Antihistamines", "Decongestants", "Allergen immunotherapy in selected cases"],
+      "references": "AAAAI Allergic Rhinitis. NIH. For educational use only."
+    },
+    {
+      "id": "migraine",
+      "name": "Migraine",
+      "description": "Recurrent headache disorder, often one-sided and pulsating, with or without aura. Can be disabling.",
+      "symptoms": ["severe headache", "nausea", "sensitivity to light", "sensitivity to sound", "vomiting", "aura"],
+      "diagnostics": ["Clinical criteria (ICHD)", "Neurological examination", "Neuroimaging if red flags"],
+      "treatment": ["Acute: triptans, NSAIDs, antiemetics", "Preventive: beta-blockers, anticonvulsants, CGRP antagonists", "Lifestyle: sleep, stress management, trigger avoidance"],
+      "references": "ICHD-3. AAN Migraine guidelines. For educational use only."
+    },
+    {
+      "id": "tension_headache",
+      "name": "Tension-Type Headache",
+      "description": "Most common primary headache. Typically bilateral, pressing/tightening quality, mild to moderate intensity.",
+      "symptoms": ["headache", "pressure around forehead", "neck pain", "tightness in head"],
+      "diagnostics": ["Clinical history", "Exclusion of red flags", "Neurological exam if indicated"],
+      "treatment": ["OTC analgesics (e.g. ibuprofen, acetaminophen)", "Stress reduction", "Physical therapy for neck if relevant"],
+      "references": "ICHD-3. For educational use only."
+    },
+    {
+      "id": "gastroenteritis",
+      "name": "Gastroenteritis (Acute)",
+      "description": "Inflammation of the stomach and intestines, usually viral or bacterial. Leads to diarrhea, vomiting, and sometimes fever.",
+      "symptoms": ["diarrhea", "nausea", "vomiting", "stomach cramps", "fever", "dehydration"],
+      "diagnostics": ["Clinical assessment", "Stool studies if severe or prolonged", "Electrolytes if dehydration suspected"],
+      "treatment": ["Oral rehydration", "Bland diet as tolerated", "Antiemetics if needed", "Antibiotics only if bacterial cause confirmed"],
+      "references": "CDC Viral Gastroenteritis. WHO. For educational use only."
+    },
+    {
+      "id": "gerd",
+      "name": "GERD (Gastroesophageal Reflux Disease)",
+      "description": "Chronic condition where stomach acid frequently flows back into the esophagus, causing symptoms and sometimes tissue damage.",
+      "symptoms": ["heartburn", "chest pain", "regurgitation", "difficulty swallowing", "chronic cough", "sore throat"],
+      "diagnostics": ["Clinical history", "Trial of PPI", "Upper endoscopy if alarm symptoms or refractory", "pH monitoring if indicated"],
+      "treatment": ["Lifestyle: weight loss, smaller meals, avoid triggers", "Proton pump inhibitors (PPI)", "H2 blockers", "Surgery in selected cases"],
+      "references": "ACG GERD guidelines. For educational use only."
+    },
+    {
+      "id": "asthma",
+      "name": "Asthma",
+      "description": "Chronic airway disease with reversible bronchoconstriction, inflammation, and variable airflow limitation.",
+      "symptoms": ["wheezing", "shortness of breath", "chest tightness", "cough", "difficulty breathing"],
+      "diagnostics": ["Spirometry with bronchodilator response", "Peak flow variability", "Clinical history", "Exclusion of alternatives"],
+      "treatment": ["Inhaled corticosteroids", "Short-acting beta-agonists (rescue)", "Long-acting bronchodilators", "Avoid triggers", "Action plan"],
+      "references": "GINA guidelines. NIH NHLBI. For educational use only."
+    },
+    {
+      "id": "acute_bronchitis",
+      "name": "Acute Bronchitis",
+      "description": "Inflammation of the bronchial tubes, usually viral. Cough often lasts 1–3 weeks.",
+      "symptoms": ["cough", "mucus production", "fatigue", "shortness of breath", "chest discomfort", "mild fever"],
+      "diagnostics": ["Clinical diagnosis", "Chest X-ray if pneumonia suspected", "Pulse oximetry if hypoxemia possible"],
+      "treatment": ["Supportive care", "Rest and fluids", "Honey for cough (evidence-supported)", "Avoid unnecessary antibiotics"],
+      "references": "CDC Bronchitis. For educational use only."
+    },
+    {
+      "id": "uti",
+      "name": "Urinary Tract Infection (UTI)",
+      "description": "Infection in any part of the urinary system (urethra, bladder, ureters, kidneys). More common in women.",
+      "symptoms": ["painful urination", "frequent urination", "urgency", "lower abdominal pain", "cloudy urine", "pelvic pain"],
+      "diagnostics": ["Urinalysis", "Urine culture and susceptibility", "Imaging if complicated or recurrent"],
+      "treatment": ["Antibiotics per local guidelines and susceptibility", "Increased fluids", "Pain relief as needed"],
+      "references": "IDSA UTI guidelines. For educational use only."
+    },
+    {
+      "id": "hypertension",
+      "name": "Hypertension (High Blood Pressure)",
+      "description": "Persistently elevated blood pressure. Major modifiable risk factor for cardiovascular and kidney disease.",
+      "symptoms": ["headaches", "dizziness", "blurred vision", "chest pain", "shortness of breath", "often asymptomatic"],
+      "diagnostics": ["Repeated BP measurement (office and/or home)", "Ambulatory BP monitoring if indicated", "Basic labs and ECG"],
+      "treatment": ["Lifestyle: DASH diet, exercise, weight loss, limit alcohol/sodium", "Antihypertensive drugs per guidelines", "Treat underlying causes if secondary"],
+      "references": "ACC/AHA Hypertension guidelines. For educational use only."
+    },
+    {
+      "id": "type2_diabetes",
+      "name": "Type 2 Diabetes Mellitus",
+      "description": "Chronic metabolic disorder with hyperglycemia due to insulin resistance and/or relative insulin deficiency.",
+      "symptoms": ["increased thirst", "frequent urination", "fatigue", "blurred vision", "slow healing", "increased hunger", "weight changes"],
+      "diagnostics": ["Fasting plasma glucose", "HbA1c", "OGTT if equivocal", "Screening in at-risk individuals"],
+      "treatment": ["Lifestyle: diet, exercise, weight management", "Metformin first line", "Additional agents (e.g. SGLT2i, GLP-1 RA) per guidelines", "Insulin when needed"],
+      "references": "ADA Standards of Medical Care. For educational use only."
+    },
+    {
+      "id": "anemia",
+      "name": "Anemia",
+      "description": "Reduction in red blood cells or hemoglobin, leading to reduced oxygen-carrying capacity. Multiple causes (iron deficiency, B12, chronic disease, etc.).",
+      "symptoms": ["fatigue", "weakness", "pale skin", "shortness of breath", "dizziness", "cold hands and feet", "irregular heartbeat"],
+      "diagnostics": ["CBC with indices", "Reticulocyte count", "Iron studies", "B12/folate", "Further workup by suspected cause"],
+      "treatment": ["Treat underlying cause", "Iron supplementation if iron deficiency", "B12/folate if deficient", "Transfusion in severe symptomatic cases"],
+      "references": "ASH. NIH Anemia. For educational use only."
+    }
+  ]
+}

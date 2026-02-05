@@ -1,0 +1,8 @@
+# Medical Knowledge System — dependencies
+# Run: pip install -r requirements.txt
+
+streamlit>=1.28.0
+
+# Optional: system monitoring (CPU, memory) on System Info page.
+# App runs without psutil if not installed.
+psutil>=5.9.0
