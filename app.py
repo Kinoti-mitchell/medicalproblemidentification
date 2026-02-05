@@ -317,56 +317,98 @@ def page_manage_diseases():
         return
 
     diseases = kb.get("diseases", [])
-    disease_options = ["— Add new disease —"] + [f"{d.get('name', '')} (id: {d.get('id', '')})" for d in diseases]
-    choice = st.selectbox("Select disease to edit or add new", options=disease_options, key="manage_choice")
 
-    is_new = choice.startswith("— Add new disease —")
-    edit_id = None if is_new else diseases[disease_options.index(choice) - 1].get("id")
-    current = get_disease_by_id(edit_id, kb) if edit_id else None
+    # -------------------------------------------------------------------------
+    # Add new disease (collapsible)
+    # -------------------------------------------------------------------------
+    with st.expander("➕ Add new disease", expanded=False):
+        with st.form("add_disease_form", clear_on_submit=True):
+            add_name = st.text_input("Name", key="add_name", placeholder="e.g. Common Cold")
+            add_description = st.text_area("Description", key="add_desc", placeholder="Brief clinical description.", height=100)
+            add_symptoms = st.text_area("Symptoms (one per line)", key="add_symptoms", placeholder="runny nose\nsore throat\ncough", height=120)
+            add_diagnostics = st.text_area("Diagnostics (one per line)", key="add_diagnostics", placeholder="Clinical examination\nLab test", height=100)
+            add_treatment = st.text_area("Treatment (one per line)", key="add_treatment", placeholder="Rest\nFluids\nMedication", height=100)
+            add_references = st.text_input("References", key="add_refs", placeholder="Optional source or citation.")
+            add_submitted = st.form_submit_button("Save new disease")
 
-    with st.form("disease_form", clear_on_submit=is_new):
-        name = st.text_input("Name", value=(current.get("name", "") if current else ""), placeholder="e.g. Common Cold")
-        description = st.text_area("Description", value=(current.get("description", "") if current else ""), placeholder="Brief clinical description.", height=100)
-        symptoms_text = st.text_area("Symptoms (one per line)", value="\n".join(current.get("symptoms", [])) if current else "", placeholder="runny nose\nsore throat\ncough", height=120)
-        diagnostics_text = st.text_area("Diagnostics (one per line)", value="\n".join(current.get("diagnostics", [])) if current else "", placeholder="Clinical examination\nLab test", height=100)
-        treatment_text = st.text_area("Treatment (one per line)", value="\n".join(current.get("treatment", [])) if current else "", placeholder="Rest\nFluids\nMedication", height=100)
-        references = st.text_input("References", value=(current.get("references", "") if current else ""), placeholder="Optional source or citation.")
+        if add_submitted:
+            if not add_name or not add_name.strip():
+                st.warning("Name is required.")
+            else:
+                try:
+                    kb = add_disease(
+                        kb,
+                        add_name.strip(),
+                        add_description or "",
+                        _parse_list_text(add_symptoms),
+                        _parse_list_text(add_diagnostics),
+                        _parse_list_text(add_treatment),
+                        add_references or "",
+                    )
+                    save_knowledge_base(kb)
+                    st.success(f"Added **{add_name.strip()}**.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save: {e}")
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            submitted = st.form_submit_button("Save")
-        with col2:
-            delete_submitted = st.form_submit_button("Delete") if not is_new else None
-        with col3:
-            pass
-
-    if submitted:
-        if not name or not name.strip():
-            st.warning("Name is required.")
+    # -------------------------------------------------------------------------
+    # Edit existing disease (collapsible; dropdown inside)
+    # -------------------------------------------------------------------------
+    with st.expander("✏️ Edit existing disease", expanded=False):
+        if not diseases:
+            st.info("No diseases in the knowledge base yet. Use **Add new disease** above.")
         else:
-            symptoms_list = _parse_list_text(symptoms_text)
-            diagnostics_list = _parse_list_text(diagnostics_text)
-            treatment_list = _parse_list_text(treatment_text)
-            try:
-                if is_new:
-                    kb = add_disease(kb, name.strip(), description, symptoms_list, diagnostics_list, treatment_list, references)
-                    st.success(f"Added **{name.strip()}**.")
-                else:
-                    kb = update_disease(kb, edit_id, name.strip(), description, symptoms_list, diagnostics_list, treatment_list, references)
-                    st.success(f"Updated **{name.strip()}**.")
-                save_knowledge_base(kb)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to save: {e}")
+            edit_options = [d.get("name", "") or "Unnamed" for d in diseases]
+            edit_choice = st.selectbox("Select disease to edit", options=edit_options, key="edit_choice", placeholder="Choose one…")
+            selected_idx = edit_options.index(edit_choice)
+            edit_id = diseases[selected_idx].get("id")
+            current = get_disease_by_id(edit_id, kb)
 
-    if not is_new and delete_submitted:
-        try:
-            kb = delete_disease(kb, edit_id)
-            save_knowledge_base(kb)
-            st.success("Disease removed.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Failed to delete: {e}")
+            # Key form and widgets by edit_id so changing the dropdown refills the form with that disease
+            if current:
+                form_key = f"edit_form_{edit_id}"
+                with st.form(form_key):
+                    edit_name = st.text_input("Name", value=current.get("name", ""), key=f"edit_name_{edit_id}")
+                    edit_description = st.text_area("Description", value=current.get("description", ""), key=f"edit_desc_{edit_id}", height=100)
+                    edit_symptoms = st.text_area("Symptoms (one per line)", value="\n".join(current.get("symptoms", [])), key=f"edit_symptoms_{edit_id}", height=120)
+                    edit_diagnostics = st.text_area("Diagnostics (one per line)", value="\n".join(current.get("diagnostics", [])), key=f"edit_diagnostics_{edit_id}", height=100)
+                    edit_treatment = st.text_area("Treatment (one per line)", value="\n".join(current.get("treatment", [])), key=f"edit_treatment_{edit_id}", height=100)
+                    edit_references = st.text_input("References", value=current.get("references", ""), key=f"edit_refs_{edit_id}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        edit_submitted = st.form_submit_button("Save changes")
+                    with col2:
+                        delete_submitted = st.form_submit_button("Delete disease")
+
+                if edit_submitted:
+                    if not edit_name or not edit_name.strip():
+                        st.warning("Name is required.")
+                    else:
+                        try:
+                            kb = update_disease(
+                                kb,
+                                edit_id,
+                                edit_name.strip(),
+                                edit_description or "",
+                                _parse_list_text(edit_symptoms),
+                                _parse_list_text(edit_diagnostics),
+                                _parse_list_text(edit_treatment),
+                                edit_references or "",
+                            )
+                            save_knowledge_base(kb)
+                            st.success(f"Updated **{edit_name.strip()}**.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to save: {e}")
+
+                if delete_submitted:
+                    try:
+                        kb = delete_disease(kb, edit_id)
+                        save_knowledge_base(kb)
+                        st.success("Disease removed.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete: {e}")
 
 
 # -----------------------------------------------------------------------------
