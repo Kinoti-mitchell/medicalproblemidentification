@@ -1,0 +1,25 @@
+{
+  "symptom_counts": {
+    "chest tightness": 1,
+    "chest pain": 1,
+    "body aches": 1,
+    "congestion": 1,
+    "chronic cough": 1,
+    "dehydration": 1,
+    "chills": 1
+  },
+  "recent_searches": [
+    {
+      "symptoms": [
+        "chest tightness",
+        "chest pain",
+        "body aches",
+        "congestion",
+        "chronic cough",
+        "dehydration",
+        "chills"
+      ],
+      "timestamp": "2026-02-07T16:35:03Z"
+    }
+  ]
+}

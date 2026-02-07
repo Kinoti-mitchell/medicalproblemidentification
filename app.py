@@ -1,30 +1,26 @@
 """
-Medical Knowledge System — Streamlit application.
-Single entry point for the UI. Uses JSON-based knowledge base (no external database).
+Medical Knowledge-Based System (KBS) — Streamlit UI.
+Satisfies classical KBS: knowledge in JSON, inference in engine, explanation facility, read-only.
 """
+
+import json
+import os
+from datetime import datetime
 
 import streamlit as st
 
-from services.knowledge_service import (
-    load_knowledge_base,
-    save_knowledge_base,
-    search_diseases_by_name,
-    search_diseases_by_symptom,
-    get_possible_conditions_for_symptoms,
-    get_all_symptoms,
-    get_disease_by_id,
-    add_disease,
-    update_disease,
-    delete_disease,
-)
+import knowledge_loader as loader
+import inference_engine as engine
 
+# Max recent searches to keep in history
+MAX_RECENT_SEARCHES = 100
 
 # -----------------------------------------------------------------------------
 # Page config and session state
 # -----------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="Medical Knowledge System",
+    page_title="Medical Knowledge-Based System",
     page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -32,93 +28,129 @@ st.set_page_config(
 
 if "page" not in st.session_state:
     st.session_state.page = "Home"
+if "last_inference_result" not in st.session_state:
+    st.session_state.last_inference_result = []
+if "last_user_symptoms" not in st.session_state:
+    st.session_state.last_user_symptoms = []
+
 
 # -----------------------------------------------------------------------------
-# Custom styling for a more engaging, polished look
+# Styling (engaging medical UI: dark theme, stat tiles, tip box)
 # -----------------------------------------------------------------------------
 
 st.markdown("""
 <style>
-    /* Softer, medical-friendly palette */
     .stApp { background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); }
     [data-testid="stSidebar"] .stMarkdown { color: #e2e8f0; }
-
-    /* Hero / big title */
     .hero-title { font-size: 2.25rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.25rem; }
-    .hero-tagline { font-size: 1.1rem; color: #94a3b8; margin-bottom: 1.5rem; }
-
-    /* Quick-action cards on home */
-    .quick-card {
-        background: linear-gradient(145deg, #1e293b 0%, #334155 100%);
-        border: 1px solid #475569;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 0.75rem 0;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        text-align: center;
-    }
-    .quick-card:hover { border-color: #38bdf8; box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15); }
-    .quick-card .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-    .quick-card .label { font-size: 1.1rem; font-weight: 600; color: #f1f5f9; }
-    .quick-card .hint { font-size: 0.85rem; color: #94a3b8; }
-
-    /* Disease result cards */
-    .disease-card {
-        background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
-        border: 1px solid #334155;
-        border-left: 4px solid #38bdf8;
-        border-radius: 12px;
-        padding: 1.25rem 1.5rem;
-        margin: 1rem 0;
-    }
-    .disease-card .disease-name { font-size: 1.35rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.5rem; }
-    .disease-card .disease-desc { color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.75rem; }
-    .match-bar-wrap { background: #334155; border-radius: 8px; height: 8px; margin: 0.5rem 0 0.75rem 0; overflow: hidden; }
-    .match-bar { height: 100%; border-radius: 8px; background: linear-gradient(90deg, #22c55e, #38bdf8); transition: width 0.5s ease; }
-    .match-label { font-size: 0.8rem; color: #94a3b8; margin-top: 0.25rem; }
-
-    /* Stat tiles on home */
-    .stat-tile {
-        background: linear-gradient(145deg, #1e293b 0%, #334155 100%);
-        border: 1px solid #475569;
-        border-radius: 12px;
-        padding: 1rem 1.25rem;
-        text-align: center;
-    }
+    .hero-tagline { font-size: 1.1rem; color: #94a3b8; margin-bottom: 1rem; }
+    .stat-tile { background: linear-gradient(145deg, #1e293b 0%, #334155 100%); border: 1px solid #475569;
+        border-radius: 12px; padding: 1rem 1.25rem; text-align: center; margin: 0.5rem 0; }
     .stat-tile .value { font-size: 1.75rem; font-weight: 800; color: #38bdf8; }
     .stat-tile .label { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-
-    /* Tip box */
-    .tip-box { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border: 1px solid #475569; border-radius: 12px; padding: 1rem 1.25rem; margin: 1rem 0; }
+    .tip-box { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border: 1px solid #475569;
+        border-radius: 12px; padding: 1rem 1.25rem; margin: 1rem 0; }
     .tip-box .tip-title { font-size: 0.85rem; font-weight: 600; color: #38bdf8; margin-bottom: 0.35rem; }
     .tip-box .tip-text { color: #cbd5e1; font-size: 0.9rem; }
-
-    /* Sidebar nav buttons feel more like tabs */
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div { border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
 
-def render_disease_card(disease: dict, show_score: bool = False):
-    """Display one disease in a styled card with optional match score bar."""
+# -----------------------------------------------------------------------------
+# Global medical disclaimer (KBS: ethical and legal safety)
+# -----------------------------------------------------------------------------
+
+def render_global_disclaimer():
+    st.markdown(
+        "**This system provides educational medical knowledge and does not replace professional medical judgment.**"
+    )
+    st.markdown("---")
+
+
+# -----------------------------------------------------------------------------
+# Load knowledge once; fail gracefully with message
+# -----------------------------------------------------------------------------
+
+@st.cache_data(ttl=300)
+def _load_kb_cached():
+    """Cache loaded knowledge for performance (1000+ rules). Only successful loads are cached."""
+    return loader.load_knowledge(use_cache=True)
+
+
+def get_kb():
+    try:
+        return _load_kb_cached()
+    except Exception as e:
+        st.error(f"Could not load knowledge base: {e}. Check data/knowledge_base.json.")
+        return None
+
+
+def _parse_list_text(text: str) -> list[str]:
+    """Parse newline- or comma-separated text into list of non-empty strings."""
+    if not text or not text.strip():
+        return []
+    return [s.strip() for s in text.replace(",", "\n").split("\n") if s.strip()]
+
+
+def _symptom_history_path() -> str:
+    base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, "data", "symptom_history.json")
+
+
+def _load_symptom_history() -> dict:
+    path = _symptom_history_path()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"symptom_counts": {}, "recent_searches": []}
+
+
+def _save_symptom_history(data: dict) -> None:
+    path = _symptom_history_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def record_symptom_search(symptoms: list[str]) -> None:
+    """Record a symptom check: update counts and append to recent searches."""
+    if not symptoms:
+        return
+    data = _load_symptom_history()
+    counts = data.get("symptom_counts", {})
+    for s in symptoms:
+        key = s.strip().lower()
+        if key:
+            counts[key] = counts.get(key, 0) + 1
+    data["symptom_counts"] = counts
+    recent = data.get("recent_searches", [])
+    recent.insert(0, {"symptoms": list(symptoms), "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")})
+    data["recent_searches"] = recent[:MAX_RECENT_SEARCHES]
+    _save_symptom_history(data)
+
+
+def clear_symptom_history() -> None:
+    """Reset symptom counts and recent searches."""
+    _save_symptom_history({"symptom_counts": {}, "recent_searches": []})
+
+
+# -----------------------------------------------------------------------------
+# Helpers: disease card (no medical logic, display only)
+# -----------------------------------------------------------------------------
+
+def render_disease_card(disease: dict, confidence: float | None = None):
     name = disease.get("name") or "Unknown"
-    desc = disease.get("description") or "No description available."
+    desc = disease.get("description") or ""
     symptoms = disease.get("symptoms") or []
     diagnostics = disease.get("diagnostics") or []
     treatment = disease.get("treatment") or []
     references = disease.get("references") or ""
-
-    score = disease.get("score") if show_score else None
-    score_pct = int((score or 0) * 100)
-
     st.subheader(name)
-    st.write(desc[:400] + ("…" if len(desc) > 400 else ""))
-
-    if score is not None:
-        st.progress(score, text=f"Match strength: {score_pct}% — {'High' if score >= 0.6 else 'Medium' if score >= 0.3 else 'Low'} relevance")
-
+    if confidence is not None:
+        st.progress(confidence, text=f"Confidence: {confidence:.0%}")
+    st.write(desc)
     col1, col2 = st.columns(2)
     with col1:
         with st.expander("📋 Symptoms"):
@@ -143,17 +175,12 @@ def render_disease_card(disease: dict, show_score: bool = False):
 def page_home():
     st.markdown('<p class="hero-title">🩺 Medical Knowledge System</p>', unsafe_allow_html=True)
     st.markdown('<p class="hero-tagline">Search conditions by name or symptom, explore possible diagnoses, and manage the knowledge base — all in one place.</p>', unsafe_allow_html=True)
-
-    try:
-        kb = load_knowledge_base()
-        diseases = kb.get("diseases", [])
-        n_diseases = len(diseases)
-        n_symptoms = len(get_all_symptoms(kb))
-    except Exception as e:
-        n_diseases = 0
-        n_symptoms = 0
-        st.error(f"Could not load knowledge base: {e}")
-
+    render_global_disclaimer()
+    kb = get_kb()
+    if kb is None:
+        return
+    n_diseases = len(kb.get("diseases", []))
+    n_symptoms = len(engine.get_all_symptoms_from_kb(kb)) if kb else 0
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(f'<div class="stat-tile"><div class="value">{n_diseases}</div><div class="label">Diseases in database</div></div>', unsafe_allow_html=True)
@@ -161,32 +188,34 @@ def page_home():
         st.markdown(f'<div class="stat-tile"><div class="value">{n_symptoms}</div><div class="label">Unique symptoms</div></div>', unsafe_allow_html=True)
     with c3:
         st.markdown('<div class="stat-tile"><div class="value">∞</div><div class="label">Searches you can run</div></div>', unsafe_allow_html=True)
-
-    st.markdown("#### What do you want to do?")
+    st.markdown("**What do you want to do?**")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔍 **Search by disease name**\n\nFind a condition by typing its name.", use_container_width=True, key="home_search_name"):
+        if st.button("🔍 **Disease Search**\n\nFind by name or by a single symptom.", use_container_width=True, key="home_search"):
             st.session_state.page = "Disease Search"
-            st.session_state.search_mode = "Name"
             st.rerun()
-        if st.button("🩸 **Search by symptom**\n\nPick a symptom and see which diseases list it.", use_container_width=True, key="home_search_symptom"):
-            st.session_state.page = "Disease Search"
-            st.session_state.search_mode = "Symptom"
-            st.rerun()
-    with col2:
-        if st.button("🧩 **Symptom checker**\n\nEnter several symptoms and get possible conditions with match scores.", use_container_width=True, key="home_symptom"):
+        if st.button("🧩 **Symptom Checker**\n\nEnter symptoms; get rule-based suggestions with confidence.", use_container_width=True, key="home_symptom"):
             st.session_state.page = "Symptom Checker"
             st.rerun()
-        if st.button("✏️ **Manage diseases**\n\nAdd, edit, or remove entries in the knowledge base.", use_container_width=True, key="home_manage"):
+    with col2:
+        if st.button("📋 **Explanation View**\n\nSee which rules fired and why a condition was suggested.", use_container_width=True, key="home_explanation"):
+            st.session_state.page = "Explanation View"
+            st.rerun()
+        if st.button("⚙️ **System Info**\n\nKnowledge version, load time, CPU/memory.", use_container_width=True, key="home_sysinfo"):
+            st.session_state.page = "System Info"
+            st.rerun()
+    if st.button("✏️ **Manage Diseases**\n\nAdd, edit, or remove diseases in the knowledge base.", use_container_width=True, key="home_manage"):
             st.session_state.page = "Manage Diseases"
             st.rerun()
-
+    if st.button("📊 **Symptom History**\n\nView most asked symptoms and recent searches; clear history.", use_container_width=True, key="home_history"):
+            st.session_state.page = "Symptom History"
+            st.rerun()
     st.markdown("---")
     import random
     tips = [
-        "Tip: In Symptom Checker, the more symptoms you enter, the more focused the list of possible conditions.",
-        "Did you know? You can search by partial disease names — e.g. \"cold\" will find Common Cold.",
-        "The match score combines how many of your symptoms fit the condition and how many of that condition’s symptoms you listed.",
+        "Rules use partial matching: the more of a rule’s symptoms you have, the higher the confidence.",
+        "Explanation View shows the last Symptom Checker result — run a check first to see why each condition was suggested.",
+        "The knowledge base is read-only; rules and diseases are defined in data/knowledge_base.json.",
     ]
     tip = random.choice(tips)
     st.markdown(f'<div class="tip-box"><div class="tip-title">💡 Quick tip</div><div class="tip-text">{tip}</div></div>', unsafe_allow_html=True)
@@ -195,132 +224,113 @@ def page_home():
 def page_disease_search():
     st.markdown("### 🔍 Disease Search")
     st.caption("Find conditions by name or by a single symptom.")
-
-    try:
-        kb = load_knowledge_base()
-    except Exception as e:
-        st.error(f"Could not load knowledge base: {e}")
+    render_global_disclaimer()
+    kb = get_kb()
+    if kb is None:
         return
-
-    default_idx = 1 if st.session_state.get("search_mode") == "Symptom" else 0
-    search_mode = st.radio(
-        "Search by",
-        ["Name", "Symptom"],
-        horizontal=True,
-        index=default_idx,
-        label_visibility="collapsed",
-        key="search_radio",
-    )
-
+    search_mode = st.radio("Search by", ["Name", "Symptom"], horizontal=True, label_visibility="collapsed")
     if search_mode == "Name":
-        query = st.text_input("Disease name", placeholder="e.g. Asthma, Migraine, Cold", key="name_search")
+        query = st.text_input("Disease name", placeholder="e.g. Asthma, Migraine", key="name_search")
         if query:
-            results = search_diseases_by_name(query, kb)
+            q = query.strip().lower()
+            results = [d for d in kb.get("diseases", []) if d.get("name") and q in d.get("name", "").lower()]
             if not results:
-                st.info("No diseases found with that name. Try a shorter or different term.")
+                st.info("No diseases found with that name.")
             else:
-                st.success(f"Found **{len(results)}** disease(s).")
                 for d in results:
                     render_disease_card(d)
     else:
-        all_symptoms = get_all_symptoms(kb)
+        all_symptoms = engine.get_all_symptoms_from_kb(kb)
         if not all_symptoms:
-            st.warning("No symptoms in the knowledge base yet. Add diseases in **Manage Diseases**.")
+            st.warning("No symptoms in knowledge base.")
             return
-        selected = st.selectbox("Select a symptom", options=[""] + all_symptoms, key="symptom_search_select", placeholder="Choose one…")
+        selected = st.selectbox("Select a symptom", options=[""] + all_symptoms, key="symptom_search")
         if selected:
-            results = search_diseases_by_symptom(selected, kb)
+            results = [d for d in kb.get("diseases", []) if selected in (d.get("symptoms") or [])]
             if not results:
                 st.info("No diseases list this symptom.")
             else:
-                st.success(f"**{selected}** may be associated with **{len(results)}** condition(s).")
+                st.success(f"**{selected}** may be associated with {len(results)} condition(s).")
                 for d in results:
                     render_disease_card(d)
 
 
 def page_symptom_checker():
     st.markdown("### 🧩 Symptom Checker")
-    st.markdown("Enter **multiple symptoms** to see possible conditions, sorted by how well they match.")
-
-    try:
-        kb = load_knowledge_base()
-    except Exception as e:
-        st.error(f"Could not load knowledge base: {e}")
+    st.caption("Enter symptoms; the inference engine matches rules and returns possible conditions with confidence.")
+    render_global_disclaimer()
+    kb = get_kb()
+    if kb is None:
         return
-
-    all_symptoms = get_all_symptoms(kb)
+    all_symptoms = engine.get_all_symptoms_from_kb(kb)
     input_method = st.radio(
         "How to enter symptoms",
         ["Select from list", "Type (comma-separated)"],
         horizontal=True,
         key="symptom_input_method",
     )
-
+    check_clicked = st.button("🔎 Check possible conditions", type="primary", key="symptom_check_btn")
+    st.markdown("**Enter or select symptoms:**")
     symptoms = []
     if input_method == "Select from list":
-        symptoms = st.multiselect("Symptoms", options=all_symptoms, placeholder="Choose one or more…", key="symptom_multiselect")
+        symptoms = st.multiselect("Symptoms", options=all_symptoms, placeholder="Choose one or more…", key="symptom_multiselect", label_visibility="collapsed")
     else:
-        raw = st.text_input("Symptoms", placeholder="e.g. headache, nausea, sensitivity to light", key="symptom_text")
+        raw = st.text_input("Symptoms", placeholder="e.g. headache, nausea, sensitivity to light", key="symptom_text", label_visibility="collapsed")
         if raw:
             symptoms = [s.strip() for s in raw.split(",") if s.strip()]
-
-    if st.button("🔎 Check possible conditions", type="primary", key="symptom_check_btn"):
+    if check_clicked:
         if not symptoms:
             st.warning("Enter or select at least one symptom.")
         else:
-            results = get_possible_conditions_for_symptoms(symptoms, kb)
+            record_symptom_search(list(symptoms))
+            results = engine.forward_chain(symptoms, kb)
+            st.session_state.last_inference_result = results
+            st.session_state.last_user_symptoms = list(symptoms)
             if not results:
-                st.info("No conditions closely match these symptoms. Try different or fewer terms.")
+                st.info("No rules matched these symptoms. Try different or additional symptoms.")
             else:
-                st.success(f"**{len(results)}** possible condition(s) — sorted by match strength below.")
-                for d in results:
-                    render_disease_card(d, show_score=True)
+                st.success(f"**{len(results)}** possible condition(s) from rule matching.")
+                for r in results:
+                    disease = engine.get_disease_by_id(r["disease_id"], kb)
+                    if disease:
+                        render_disease_card(disease, confidence=r["confidence"])
+                        with st.expander("Why was this suggested?"):
+                            st.write(r.get("explanation", ""))
 
 
-def page_system_info():
-    st.markdown("### ⚙️ System Info")
-    st.caption("Optional system monitoring when **psutil** is installed.")
-    try:
-        import psutil
-        col1, col2 = st.columns(2)
-        with col1:
-            cpu = psutil.cpu_percent(interval=1)
-            st.metric("CPU usage", f"{cpu:.1f}%")
-        with col2:
-            mem = psutil.virtual_memory()
-            st.metric("Memory usage", f"{mem.percent:.1f}%")
-        st.caption("Values are current at time of page load.")
-    except ImportError:
-        st.info("**psutil** is not installed. To enable CPU and memory display, run: `pip install psutil`")
-
-
-def _parse_list_text(text: str) -> list[str]:
-    """Parse newline- or comma-separated text into list of non-empty stripped strings."""
-    if not text or not text.strip():
-        return []
-    items = []
-    for line in text.replace(",", "\n").split("\n"):
-        s = line.strip()
-        if s:
-            items.append(s)
-    return items
+def page_explanation_view():
+    st.markdown("### 📋 Explanation View")
+    st.caption("See which rules fired and which symptoms matched for each recommendation.")
+    render_global_disclaimer()
+    kb = get_kb()
+    if kb is None:
+        return
+    results = st.session_state.get("last_inference_result", [])
+    user_symptoms = st.session_state.get("last_user_symptoms", [])
+    if not results:
+        st.info("Run **Symptom Checker** first to see explanations for recommendations.")
+        return
+    st.markdown(f"**Your symptoms:** {', '.join(user_symptoms)}")
+    st.markdown("---")
+    for r in results:
+        st.markdown(f"#### {r.get('disease_name', '')} (confidence {r.get('confidence', 0):.0%})")
+        st.markdown("**Matched symptoms:** " + ", ".join(r.get("matched_symptoms", [])))
+        st.markdown("**Rules that fired:**")
+        for fr in r.get("fired_rules", []):
+            st.write(f"- Rule **{fr.get('rule_id', '')}**: matched {fr.get('matched_symptoms', [])} → confidence {fr.get('rule_confidence', 0):.0%}")
+        st.markdown("**Explanation:** " + (r.get("explanation") or ""))
+        st.markdown("---")
 
 
 def page_manage_diseases():
     st.markdown("### ✏️ Manage Diseases")
-    st.caption("Add new conditions or edit existing ones. Changes are saved to the knowledge base.")
-
-    try:
-        kb = load_knowledge_base()
-    except Exception as e:
-        st.error(f"Could not load knowledge base: {e}")
+    st.caption("Add new diseases or edit existing ones in the knowledge base. Changes are saved to data/knowledge_base.json.")
+    render_global_disclaimer()
+    kb = get_kb()
+    if kb is None:
         return
-
     diseases = kb.get("diseases", [])
 
-    # -------------------------------------------------------------------------
-    # Add new disease (collapsible)
-    # -------------------------------------------------------------------------
     with st.expander("➕ Add new disease", expanded=False):
         with st.form("add_disease_form", clear_on_submit=True):
             add_name = st.text_input("Name", key="add_name", placeholder="e.g. Common Cold")
@@ -330,41 +340,27 @@ def page_manage_diseases():
             add_treatment = st.text_area("Treatment (one per line)", key="add_treatment", placeholder="Rest\nFluids\nMedication", height=100)
             add_references = st.text_input("References", key="add_refs", placeholder="Optional source or citation.")
             add_submitted = st.form_submit_button("Save new disease")
+        if add_submitted and add_name and add_name.strip():
+            try:
+                kb = loader.add_disease(kb, add_name.strip(), add_description or "", _parse_list_text(add_symptoms), _parse_list_text(add_diagnostics), _parse_list_text(add_treatment), add_references or "")
+                loader.save_knowledge_base(kb)
+                st.cache_data.clear()
+                st.success(f"Added **{add_name.strip()}**.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to save: {e}")
+        elif add_submitted:
+            st.warning("Name is required.")
 
-        if add_submitted:
-            if not add_name or not add_name.strip():
-                st.warning("Name is required.")
-            else:
-                try:
-                    kb = add_disease(
-                        kb,
-                        add_name.strip(),
-                        add_description or "",
-                        _parse_list_text(add_symptoms),
-                        _parse_list_text(add_diagnostics),
-                        _parse_list_text(add_treatment),
-                        add_references or "",
-                    )
-                    save_knowledge_base(kb)
-                    st.success(f"Added **{add_name.strip()}**.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to save: {e}")
-
-    # -------------------------------------------------------------------------
-    # Edit existing disease (collapsible; dropdown inside)
-    # -------------------------------------------------------------------------
     with st.expander("✏️ Edit existing disease", expanded=False):
         if not diseases:
-            st.info("No diseases in the knowledge base yet. Use **Add new disease** above.")
+            st.info("No diseases yet. Use **Add new disease** above.")
         else:
             edit_options = [d.get("name", "") or "Unnamed" for d in diseases]
             edit_choice = st.selectbox("Select disease to edit", options=edit_options, key="edit_choice", placeholder="Choose one…")
             selected_idx = edit_options.index(edit_choice)
             edit_id = diseases[selected_idx].get("id")
-            current = get_disease_by_id(edit_id, kb)
-
-            # Key form and widgets by edit_id so changing the dropdown refills the form with that disease
+            current = loader.get_disease_by_id(edit_id, kb)
             if current:
                 form_key = f"edit_form_{edit_id}"
                 with st.form(form_key):
@@ -379,36 +375,78 @@ def page_manage_diseases():
                         edit_submitted = st.form_submit_button("Save changes")
                     with col2:
                         delete_submitted = st.form_submit_button("Delete disease")
-
-                if edit_submitted:
-                    if not edit_name or not edit_name.strip():
-                        st.warning("Name is required.")
-                    else:
-                        try:
-                            kb = update_disease(
-                                kb,
-                                edit_id,
-                                edit_name.strip(),
-                                edit_description or "",
-                                _parse_list_text(edit_symptoms),
-                                _parse_list_text(edit_diagnostics),
-                                _parse_list_text(edit_treatment),
-                                edit_references or "",
-                            )
-                            save_knowledge_base(kb)
-                            st.success(f"Updated **{edit_name.strip()}**.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed to save: {e}")
-
+                if edit_submitted and edit_name and edit_name.strip():
+                    try:
+                        kb = loader.update_disease(kb, edit_id, edit_name.strip(), edit_description or "", _parse_list_text(edit_symptoms), _parse_list_text(edit_diagnostics), _parse_list_text(edit_treatment), edit_references or "")
+                        loader.save_knowledge_base(kb)
+                        st.cache_data.clear()
+                        st.success(f"Updated **{edit_name.strip()}**.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to save: {e}")
                 if delete_submitted:
                     try:
-                        kb = delete_disease(kb, edit_id)
-                        save_knowledge_base(kb)
+                        kb = loader.delete_disease(kb, edit_id)
+                        loader.save_knowledge_base(kb)
+                        st.cache_data.clear()
                         st.success("Disease removed.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Failed to delete: {e}")
+
+
+def page_symptom_history():
+    st.markdown("### 📊 Symptom History")
+    st.caption("Most asked symptoms and recent symptom checks. Manage or clear history below.")
+    render_global_disclaimer()
+    data = _load_symptom_history()
+    counts = data.get("symptom_counts", {})
+    recent = data.get("recent_searches", [])
+
+    st.markdown("**Most asked symptoms**")
+    if not counts:
+        st.info("No symptom checks recorded yet. Use **Symptom Checker** to run a search.")
+    else:
+        sorted_symptoms = sorted(counts.items(), key=lambda x: -x[1])
+        for i, (symptom, count) in enumerate(sorted_symptoms, 1):
+            st.write(f"{i}. **{symptom}** — searched {count} time(s)")
+    st.markdown("---")
+    st.markdown("**Recent searches**")
+    if not recent:
+        st.caption("No recent searches.")
+    else:
+        for i, entry in enumerate(recent[:20]):
+            syms = entry.get("symptoms", [])
+            ts = entry.get("timestamp", "")
+            st.caption(f"{ts[:19] if ts else '—'} — {', '.join(syms)}")
+    st.markdown("---")
+    if st.button("Clear history", type="secondary", key="clear_symptom_history"):
+        clear_symptom_history()
+        st.success("History cleared.")
+        st.rerun()
+
+
+def page_system_info():
+    st.markdown("### ⚙️ System Info")
+    render_global_disclaimer()
+    info = loader.get_load_info()
+    st.markdown("**Knowledge base**")
+    st.write(f"- Version: {info['knowledge_version']}")
+    st.write(f"- Last updated (KB): {info['last_updated']}")
+    st.write(f"- Load time: {info['load_time']}")
+    st.write(f"- Validation status: {info['validation_status']}")
+    if info.get("validation_errors"):
+        st.warning("Validation issues: " + "; ".join(info["validation_errors"][:5]))
+    st.markdown("**System monitoring**")
+    try:
+        import psutil
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("CPU usage", f"{psutil.cpu_percent(interval=0.5):.1f}%")
+        with col2:
+            st.metric("Memory usage", f"{psutil.virtual_memory().percent:.1f}%")
+    except ImportError:
+        st.info("Install **psutil** for CPU and memory display. The app runs without it.")
 
 
 # -----------------------------------------------------------------------------
@@ -416,9 +454,8 @@ def page_manage_diseases():
 # -----------------------------------------------------------------------------
 
 with st.sidebar:
-    st.markdown("### 🩺 Medical Knowledge System")
+    st.markdown("### 🩺 Medical KBS")
     st.markdown("---")
-    st.markdown("**Navigation**")
     cur = st.session_state.page
     if st.button(("🏠 Home" + (" ✓" if cur == "Home" else "")), use_container_width=True, key="nav_home", type="primary" if cur == "Home" else "secondary"):
         st.session_state.page = "Home"
@@ -429,8 +466,14 @@ with st.sidebar:
     if st.button(("🧩 Symptom Checker" + (" ✓" if cur == "Symptom Checker" else "")), use_container_width=True, key="nav_symptom", type="primary" if cur == "Symptom Checker" else "secondary"):
         st.session_state.page = "Symptom Checker"
         st.rerun()
+    if st.button(("📋 Explanation View" + (" ✓" if cur == "Explanation View" else "")), use_container_width=True, key="nav_explanation", type="primary" if cur == "Explanation View" else "secondary"):
+        st.session_state.page = "Explanation View"
+        st.rerun()
     if st.button(("✏️ Manage Diseases" + (" ✓" if cur == "Manage Diseases" else "")), use_container_width=True, key="nav_manage", type="primary" if cur == "Manage Diseases" else "secondary"):
         st.session_state.page = "Manage Diseases"
+        st.rerun()
+    if st.button(("📊 Symptom History" + (" ✓" if cur == "Symptom History" else "")), use_container_width=True, key="nav_history", type="primary" if cur == "Symptom History" else "secondary"):
+        st.session_state.page = "Symptom History"
         st.rerun()
     if st.button(("⚙️ System Info" + (" ✓" if cur == "System Info" else "")), use_container_width=True, key="nav_sysinfo", type="primary" if cur == "System Info" else "secondary"):
         st.session_state.page = "System Info"
@@ -438,7 +481,7 @@ with st.sidebar:
     st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# Main: render selected page
+# Main
 # -----------------------------------------------------------------------------
 
 if st.session_state.page == "Home":
@@ -447,8 +490,12 @@ elif st.session_state.page == "Disease Search":
     page_disease_search()
 elif st.session_state.page == "Symptom Checker":
     page_symptom_checker()
+elif st.session_state.page == "Explanation View":
+    page_explanation_view()
 elif st.session_state.page == "Manage Diseases":
     page_manage_diseases()
+elif st.session_state.page == "Symptom History":
+    page_symptom_history()
 elif st.session_state.page == "System Info":
     page_system_info()
 else:
