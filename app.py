@@ -192,7 +192,7 @@ def page_home():
         if st.button("⚙️ **System Info**\n\nKnowledge version, load time, CPU/memory.", use_container_width=True, key="home_sysinfo"):
             st.session_state.page = "System Info"
             st.rerun()
-    if st.button("✏️ **Manage Diseases**\n\nAdd, edit, or remove diseases in the knowledge base.", use_container_width=True, key="home_manage"):
+    if st.button("✏️ **Manage**\n\nManage diseases and rules in the knowledge base.", use_container_width=True, key="home_manage"):
             st.session_state.page = "Manage Diseases"
             st.rerun()
     if st.button("📊 **Symptom History**\n\nView most asked symptoms and recent searches; clear history.", use_container_width=True, key="home_history"):
@@ -308,75 +308,211 @@ def page_explanation_view():
 
 
 def page_manage_diseases():
-    st.markdown("### ✏️ Manage Diseases")
-    st.caption("Add new diseases or edit existing ones in the knowledge base. Changes are saved to data/knowledge_base.json.")
+    st.markdown("### ✏️ Manage")
+    st.caption("Manage symptoms, diseases, and rules in the knowledge base. Changes are saved to data/knowledge_base.json.")
     kb = get_kb()
     if kb is None:
         return
     diseases = kb.get("diseases", [])
+    rules = kb.get("rules", [])
+    disease_options = [(d.get("id", ""), d.get("name", "") or "Unnamed") for d in diseases]
 
-    with st.expander("➕ Add new disease", expanded=False):
-        with st.form("add_disease_form", clear_on_submit=True):
-            add_name = st.text_input("Name", key="add_name", placeholder="e.g. Common Cold")
-            add_description = st.text_area("Description", key="add_desc", placeholder="Brief clinical description.", height=100)
-            add_symptoms = st.text_area("Symptoms (one per line)", key="add_symptoms", placeholder="runny nose\nsore throat\ncough", height=120)
-            add_diagnostics = st.text_area("Diagnostics (one per line)", key="add_diagnostics", placeholder="Clinical examination\nLab test", height=100)
-            add_treatment = st.text_area("Treatment (one per line)", key="add_treatment", placeholder="Rest\nFluids\nMedication", height=100)
-            add_references = st.text_input("References", key="add_refs", placeholder="Optional source or citation.")
-            add_submitted = st.form_submit_button("Save new disease")
-        if add_submitted and add_name and add_name.strip():
-            try:
-                kb = loader.add_disease(kb, add_name.strip(), add_description or "", _parse_list_text(add_symptoms), _parse_list_text(add_diagnostics), _parse_list_text(add_treatment), add_references or "")
-                loader.save_knowledge_base(kb)
-                st.cache_data.clear()
-                st.success(f"Added **{add_name.strip()}**.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Failed to save: {e}")
-        elif add_submitted:
-            st.warning("Name is required.")
+    tab_symptoms, tab_diseases, tab_rules = st.tabs(["🩺 Symptoms", "📋 Diseases", "📐 Rules"])
 
-    with st.expander("✏️ Edit existing disease", expanded=False):
-        if not diseases:
-            st.info("No diseases yet. Use **Add new disease** above.")
-        else:
-            edit_options = [d.get("name", "") or "Unnamed" for d in diseases]
-            edit_choice = st.selectbox("Select disease to edit", options=edit_options, key="edit_choice", placeholder="Choose one…")
-            selected_idx = edit_options.index(edit_choice)
-            edit_id = diseases[selected_idx].get("id")
-            current = loader.get_disease_by_id(edit_id, kb)
-            if current:
-                form_key = f"edit_form_{edit_id}"
-                with st.form(form_key):
-                    edit_name = st.text_input("Name", value=current.get("name", ""), key=f"edit_name_{edit_id}")
-                    edit_description = st.text_area("Description", value=current.get("description", ""), key=f"edit_desc_{edit_id}", height=100)
-                    edit_symptoms = st.text_area("Symptoms (one per line)", value="\n".join(current.get("symptoms", [])), key=f"edit_symptoms_{edit_id}", height=120)
-                    edit_diagnostics = st.text_area("Diagnostics (one per line)", value="\n".join(current.get("diagnostics", [])), key=f"edit_diagnostics_{edit_id}", height=100)
-                    edit_treatment = st.text_area("Treatment (one per line)", value="\n".join(current.get("treatment", [])), key=f"edit_treatment_{edit_id}", height=100)
-                    edit_references = st.text_input("References", value=current.get("references", ""), key=f"edit_refs_{edit_id}")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        edit_submitted = st.form_submit_button("Save changes")
-                    with col2:
-                        delete_submitted = st.form_submit_button("Delete disease")
-                if edit_submitted and edit_name and edit_name.strip():
+    with tab_symptoms:
+        managed_symptoms = loader.get_symptoms_list(kb)
+        with st.expander("➕ Add new symptom(s)", expanded=False):
+            with st.form("add_symptom_form", clear_on_submit=True):
+                add_symptom_text = st.text_area("Symptom name(s), one per line", key="add_symptom_text", placeholder="e.g. runny nose\nsore throat", height=80)
+                add_symptom_submitted = st.form_submit_button("Add")
+            if add_symptom_submitted:
+                to_add = _parse_list_text(add_symptom_text)
+                if not to_add:
+                    st.warning("Enter at least one symptom.")
+                else:
                     try:
-                        kb = loader.update_disease(kb, edit_id, edit_name.strip(), edit_description or "", _parse_list_text(edit_symptoms), _parse_list_text(edit_diagnostics), _parse_list_text(edit_treatment), edit_references or "")
+                        for name in to_add:
+                            kb = loader.add_symptom(kb, name)
                         loader.save_knowledge_base(kb)
                         st.cache_data.clear()
-                        st.success(f"Updated **{edit_name.strip()}**.")
+                        st.success(f"Added {len(to_add)} symptom(s).")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Failed to save: {e}")
-                if delete_submitted:
+
+        with st.expander("✏️ Edit or delete symptom", expanded=False):
+            if not managed_symptoms:
+                st.info("No managed symptoms yet. Add symptoms above (or they will appear here once added via diseases/rules and facts).")
+            else:
+                edit_sym_choice = st.selectbox("Select symptom to edit or delete", options=managed_symptoms, key="edit_symptom_choice", placeholder="Choose one…")
+                if edit_sym_choice:
+                    with st.form("edit_symptom_form"):
+                        edit_symptom_new = st.text_input("New name (leave unchanged to only delete)", value=edit_sym_choice, key="edit_symptom_new")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edit_symptom_save = st.form_submit_button("Save (rename)")
+                        with col2:
+                            edit_symptom_delete = st.form_submit_button("Delete symptom")
+                    if edit_symptom_save and edit_symptom_new and edit_symptom_new.strip() != edit_sym_choice:
+                        try:
+                            kb = loader.update_symptom(kb, edit_sym_choice, edit_symptom_new.strip())
+                            loader.save_knowledge_base(kb)
+                            st.cache_data.clear()
+                            st.success(f"Renamed to **{edit_symptom_new.strip()}**.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to rename: {e}")
+                    if edit_symptom_delete:
+                        try:
+                            kb = loader.delete_symptom(kb, edit_sym_choice)
+                            loader.save_knowledge_base(kb)
+                            st.cache_data.clear()
+                            st.success("Symptom removed from knowledge base.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to delete: {e}")
+
+    with tab_diseases:
+        with st.expander("➕ Add new disease", expanded=False):
+            with st.form("add_disease_form", clear_on_submit=True):
+                add_name = st.text_input("Name", key="add_name", placeholder="e.g. Common Cold")
+                add_description = st.text_area("Description", key="add_desc", placeholder="Brief clinical description.", height=100)
+                add_symptoms = st.text_area("Symptoms (one per line)", key="add_symptoms", placeholder="runny nose\nsore throat\ncough", height=120)
+                add_diagnostics = st.text_area("Diagnostics (one per line)", key="add_diagnostics", placeholder="Clinical examination\nLab test", height=100)
+                add_treatment = st.text_area("Treatment (one per line)", key="add_treatment", placeholder="Rest\nFluids\nMedication", height=100)
+                add_references = st.text_input("References", key="add_refs", placeholder="Optional source or citation.")
+                add_submitted = st.form_submit_button("Save new disease")
+            if add_submitted and add_name and add_name.strip():
+                try:
+                    kb = loader.add_disease(kb, add_name.strip(), add_description or "", _parse_list_text(add_symptoms), _parse_list_text(add_diagnostics), _parse_list_text(add_treatment), add_references or "")
+                    loader.save_knowledge_base(kb)
+                    st.cache_data.clear()
+                    st.success(f"Added **{add_name.strip()}**.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save: {e}")
+            elif add_submitted:
+                st.warning("Name is required.")
+
+        with st.expander("✏️ Edit existing disease", expanded=False):
+            if not diseases:
+                st.info("No diseases yet. Use **Add new disease** above.")
+            else:
+                edit_options = [d.get("name", "") or "Unnamed" for d in diseases]
+                edit_choice = st.selectbox("Select disease to edit", options=edit_options, key="edit_choice", placeholder="Choose one…")
+                selected_idx = edit_options.index(edit_choice)
+                edit_id = diseases[selected_idx].get("id")
+                current = loader.get_disease_by_id(edit_id, kb)
+                if current:
+                    form_key = f"edit_form_{edit_id}"
+                    with st.form(form_key):
+                        edit_name = st.text_input("Name", value=current.get("name", ""), key=f"edit_name_{edit_id}")
+                        edit_description = st.text_area("Description", value=current.get("description", ""), key=f"edit_desc_{edit_id}", height=100)
+                        edit_symptoms = st.text_area("Symptoms (one per line)", value="\n".join(current.get("symptoms", [])), key=f"edit_symptoms_{edit_id}", height=120)
+                        edit_diagnostics = st.text_area("Diagnostics (one per line)", value="\n".join(current.get("diagnostics", [])), key=f"edit_diagnostics_{edit_id}", height=100)
+                        edit_treatment = st.text_area("Treatment (one per line)", value="\n".join(current.get("treatment", [])), key=f"edit_treatment_{edit_id}", height=100)
+                        edit_references = st.text_input("References", value=current.get("references", ""), key=f"edit_refs_{edit_id}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edit_submitted = st.form_submit_button("Save changes")
+                        with col2:
+                            delete_submitted = st.form_submit_button("Delete disease")
+                    if edit_submitted and edit_name and edit_name.strip():
+                        try:
+                            kb = loader.update_disease(kb, edit_id, edit_name.strip(), edit_description or "", _parse_list_text(edit_symptoms), _parse_list_text(edit_diagnostics), _parse_list_text(edit_treatment), edit_references or "")
+                            loader.save_knowledge_base(kb)
+                            st.cache_data.clear()
+                            st.success(f"Updated **{edit_name.strip()}**.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to save: {e}")
+                    if delete_submitted:
+                        try:
+                            kb = loader.delete_disease(kb, edit_id)
+                            loader.save_knowledge_base(kb)
+                            st.cache_data.clear()
+                            st.success("Disease removed.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to delete: {e}")
+
+    with tab_rules:
+        all_symptom_options = engine.get_all_symptoms_from_kb(kb)
+
+        def _next_rule_id(kb_dict):
+            existing = {r.get("id", "") for r in kb_dict.get("rules", []) if isinstance(r, dict)}
+            i = 1
+            while f"R{i}" in existing:
+                i += 1
+            return f"R{i}"
+
+        add_rule_submitted = False
+        next_rid = _next_rule_id(kb)
+        with st.expander("➕ Add new rule", expanded=False):
+            if not disease_options:
+                st.info("Add at least one disease above before adding rules.")
+            else:
+                with st.form("add_rule_form", clear_on_submit=True):
+                    st.caption("Rule ID (auto)")
+                    st.text(next_rid)
+                    add_if_symptoms = st.text_area("IF symptoms (one per line)", key="add_rule_if", placeholder="runny nose\nsore throat\ncough", height=100)
+                    add_then_id = st.selectbox("THEN disease", options=[did for did, _ in disease_options], format_func=lambda x: next((n for i, n in disease_options if i == x), x), key="add_rule_then")
+                    add_confidence = st.number_input("Confidence (0–1)", min_value=0.0, max_value=1.0, value=0.8, step=0.05, key="add_rule_conf")
+                    add_rule_submitted = st.form_submit_button("Save new rule")
+            if add_rule_submitted and disease_options:
+                if not add_then_id:
+                    st.warning("Select a disease (THEN).")
+                else:
                     try:
-                        kb = loader.delete_disease(kb, edit_id)
+                        kb = loader.add_rule(kb, next_rid, _parse_list_text(add_if_symptoms), add_then_id, add_confidence)
                         loader.save_knowledge_base(kb)
                         st.cache_data.clear()
-                        st.success("Disease removed.")
+                        st.success("Rule added.")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Failed to delete: {e}")
+                        st.error(f"Failed to save: {e}")
+
+        with st.expander("✏️ Edit existing rule", expanded=False):
+            if not rules:
+                st.info("No rules yet. Add a rule above.")
+            else:
+                rule_options = [f"{r.get('id', '')}: {', '.join((r.get('if_symptoms') or [])[:3])}{'…' if len(r.get('if_symptoms') or []) > 3 else ''} → {next((n for i, n in disease_options if i == r.get('then_disease_id')), r.get('then_disease_id', ''))}" for r in rules]
+                rule_choice = st.selectbox("Select rule to edit", options=rule_options, key="rule_edit_choice")
+                rule_idx = rule_options.index(rule_choice)
+                rule_id = rules[rule_idx].get("id")
+                current_rule = loader.get_rule_by_id(rule_id, kb)
+                if current_rule:
+                    form_key = f"edit_rule_form_{rule_id}"
+                    with st.form(form_key):
+                        st.text_input("Rule ID (read-only)", value=rule_id, key=f"edit_rule_id_{rule_id}", disabled=True)
+                        edit_rule_if = st.text_area("IF symptoms (one per line)", value="\n".join(current_rule.get("if_symptoms", [])), key=f"edit_rule_if_{rule_id}", height=100)
+                        rule_then_ids = [did for did, _ in disease_options]
+                        rule_then_idx = rule_then_ids.index(current_rule.get("then_disease_id")) if current_rule.get("then_disease_id") in rule_then_ids else 0
+                        edit_rule_then = st.selectbox("THEN disease", options=rule_then_ids, index=rule_then_idx, format_func=lambda x: next((n for i, n in disease_options if i == x), x), key=f"edit_rule_then_{rule_id}")
+                        edit_rule_conf = st.number_input("Confidence (0–1)", min_value=0.0, max_value=1.0, value=float(current_rule.get("confidence", 0.8)), step=0.05, key=f"edit_rule_conf_{rule_id}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            edit_rule_submitted = st.form_submit_button("Save changes")
+                        with col2:
+                            delete_rule_submitted = st.form_submit_button("Delete rule")
+                    if edit_rule_submitted:
+                        try:
+                            kb = loader.update_rule(kb, rule_id, _parse_list_text(edit_rule_if), edit_rule_then, edit_rule_conf)
+                            loader.save_knowledge_base(kb)
+                            st.cache_data.clear()
+                            st.success("Rule updated.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to save: {e}")
+                    if delete_rule_submitted:
+                        try:
+                            kb = loader.delete_rule(kb, rule_id)
+                            loader.save_knowledge_base(kb)
+                            st.cache_data.clear()
+                            st.success("Rule removed.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to delete: {e}")
 
 
 def page_symptom_history():
@@ -451,7 +587,7 @@ with st.sidebar:
     if st.button(("📋 Explanation View" + (" ✓" if cur == "Explanation View" else "")), use_container_width=True, key="nav_explanation", type="primary" if cur == "Explanation View" else "secondary"):
         st.session_state.page = "Explanation View"
         st.rerun()
-    if st.button(("✏️ Manage Diseases" + (" ✓" if cur == "Manage Diseases" else "")), use_container_width=True, key="nav_manage", type="primary" if cur == "Manage Diseases" else "secondary"):
+    if st.button(("✏️ Manage" + (" ✓" if cur == "Manage Diseases" else "")), use_container_width=True, key="nav_manage", type="primary" if cur == "Manage Diseases" else "secondary"):
         st.session_state.page = "Manage Diseases"
         st.rerun()
     if st.button(("📊 Symptom History" + (" ✓" if cur == "Symptom History" else "")), use_container_width=True, key="nav_history", type="primary" if cur == "Symptom History" else "secondary"):

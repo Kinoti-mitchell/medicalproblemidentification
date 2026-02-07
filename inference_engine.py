@@ -111,8 +111,12 @@ def get_disease_by_id(disease_id: str, kb: dict) -> dict | None:
 
 
 def get_all_symptoms_from_kb(kb: dict) -> list[str]:
-    """Unique sorted symptoms from diseases and rules for UI dropdowns."""
+    """Unique sorted symptoms from facts, diseases, and rules for UI dropdowns."""
     seen = set()
+    for s in (kb.get("facts") or {}).get("symptoms") or []:
+        t = str(s).strip()
+        if t:
+            seen.add(t)
     for d in kb.get("diseases", []):
         for s in (d.get("symptoms") or []) if isinstance(d, dict) else []:
             t = str(s).strip()

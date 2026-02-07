@@ -317,3 +317,184 @@ def get_disease_by_id(disease_id: str, kb: dict | None = None) -> dict | None:
         if isinstance(d, dict) and d.get("id") == disease_id:
             return d
     return None
+
+
+# -----------------------------------------------------------------------------
+# Rule management (for Manage Rules UI)
+# -----------------------------------------------------------------------------
+
+def _make_rule_id(existing_ids: set[str], prefix: str = "R") -> str:
+    """Generate unique rule id (R1, R2, ... or prefix_N)."""
+    i = 1
+    while f"{prefix}{i}" in existing_ids:
+        i += 1
+    return f"{prefix}{i}"
+
+
+def add_rule(
+    kb: dict,
+    rule_id: str,
+    if_symptoms: list[str],
+    then_disease_id: str,
+    confidence: float,
+) -> dict:
+    """Append a new rule. Returns updated kb."""
+    rules = list(kb.get("rules", []))
+    existing = {r.get("id", "") for r in rules if isinstance(r, dict)}
+    rid = (rule_id or "").strip() or _make_rule_id(existing)
+    if rid in existing:
+        rid = _make_rule_id(existing, prefix=rid + "_")
+    symptoms_clean = [s.strip() for s in if_symptoms if s and str(s).strip()]
+    rules.append({
+        "id": rid,
+        "if_symptoms": symptoms_clean,
+        "then_disease_id": (then_disease_id or "").strip(),
+        "confidence": max(0.0, min(1.0, float(confidence))),
+    })
+    kb["rules"] = rules
+    return kb
+
+
+def update_rule(
+    kb: dict,
+    rule_id: str,
+    if_symptoms: list[str],
+    then_disease_id: str,
+    confidence: float,
+) -> dict:
+    """Update an existing rule by id. Returns updated kb."""
+    rules = []
+    for r in kb.get("rules", []):
+        if isinstance(r, dict) and r.get("id") == rule_id:
+            rules.append({
+                "id": rule_id,
+                "if_symptoms": [s.strip() for s in if_symptoms if s and str(s).strip()],
+                "then_disease_id": (then_disease_id or "").strip(),
+                "confidence": max(0.0, min(1.0, float(confidence))),
+            })
+        else:
+            rules.append(r)
+    kb["rules"] = rules
+    return kb
+
+
+def delete_rule(kb: dict, rule_id: str) -> dict:
+    """Remove a rule by id. Returns updated kb."""
+    kb["rules"] = [r for r in kb.get("rules", []) if not (isinstance(r, dict) and r.get("id") == rule_id)]
+    return kb
+
+
+def get_rule_by_id(rule_id: str, kb: dict | None = None) -> dict | None:
+    """Return rule dict by id (for Manage form)."""
+    if kb is None:
+        kb = load_knowledge(use_cache=True)
+    for r in kb.get("rules", []):
+        if isinstance(r, dict) and r.get("id") == rule_id:
+            return r
+    return None
+
+
+# -----------------------------------------------------------------------------
+# Symptom management (facts.symptoms + sync to diseases/rules)
+# -----------------------------------------------------------------------------
+
+def _ensure_facts_symptoms(kb: dict) -> None:
+    """Ensure kb has facts.symptoms list."""
+    if "facts" not in kb or not isinstance(kb["facts"], dict):
+        kb["facts"] = {}
+    if "symptoms" not in kb["facts"] or not isinstance(kb["facts"]["symptoms"], list):
+        kb["facts"]["symptoms"] = []
+
+
+def get_symptoms_list(kb: dict) -> list[str]:
+    """Return managed symptom list (facts.symptoms), deduplicated and sorted."""
+    facts = kb.get("facts")
+    if not isinstance(facts, dict):
+        return []
+    symptoms = facts.get("symptoms")
+    if not isinstance(symptoms, list):
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for s in symptoms:
+        t = str(s).strip() if s else ""
+        if t and _normalize_symptom(t) not in seen:
+            seen.add(_normalize_symptom(t))
+            out.append(t)
+    return sorted(out)
+
+
+def add_symptom(kb: dict, name: str) -> dict:
+    """Add a symptom to facts.symptoms if not already present (normalized). Returns updated kb."""
+    _ensure_facts_symptoms(kb)
+    n = (name or "").strip()
+    if not n:
+        return kb
+    existing_norm = {_normalize_symptom(s) for s in kb["facts"]["symptoms"] if s}
+    if _normalize_symptom(n) in existing_norm:
+        return kb
+    kb["facts"]["symptoms"].append(n)
+    return kb
+
+
+def update_symptom(kb: dict, old_name: str, new_name: str) -> dict:
+    """Rename a symptom everywhere: facts.symptoms, disease.symptoms, rule.if_symptoms. Returns updated kb."""
+    old_n = (old_name or "").strip()
+    new_n = (new_name or "").strip()
+    if not old_n or not new_n or _normalize_symptom(old_n) == _normalize_symptom(new_n):
+        return kb
+    _ensure_facts_symptoms(kb)
+    old_norm = _normalize_symptom(old_n)
+    new_norm = _normalize_symptom(new_n)
+
+    # facts.symptoms
+    syms = kb["facts"]["symptoms"]
+    kb["facts"]["symptoms"] = [new_n if _normalize_symptom(str(s).strip()) == old_norm else str(s).strip() for s in syms if str(s).strip()]
+
+    # diseases
+    for d in kb.get("diseases", []):
+        if not isinstance(d, dict):
+            continue
+        s_list = d.get("symptoms")
+        if isinstance(s_list, list):
+            d["symptoms"] = [new_n if _normalize_symptom(str(s).strip()) == old_norm else str(s).strip() for s in s_list if str(s).strip()]
+
+    # rules
+    for r in kb.get("rules", []):
+        if not isinstance(r, dict):
+            continue
+        s_list = r.get("if_symptoms")
+        if isinstance(s_list, list):
+            r["if_symptoms"] = [new_n if _normalize_symptom(str(s).strip()) == old_norm else str(s).strip() for s in s_list if str(s).strip()]
+
+    return kb
+
+
+def delete_symptom(kb: dict, name: str) -> dict:
+    """Remove a symptom from facts.symptoms and from all disease.symptoms and rule.if_symptoms. Returns updated kb."""
+    n = (name or "").strip()
+    if not n:
+        return kb
+    _ensure_facts_symptoms(kb)
+    old_norm = _normalize_symptom(n)
+
+    # facts.symptoms
+    kb["facts"]["symptoms"] = [str(s).strip() for s in kb["facts"]["symptoms"] if _normalize_symptom(str(s).strip()) != old_norm]
+
+    # diseases: remove from list
+    for d in kb.get("diseases", []):
+        if not isinstance(d, dict):
+            continue
+        s_list = d.get("symptoms")
+        if isinstance(s_list, list):
+            d["symptoms"] = [str(s).strip() for s in s_list if _normalize_symptom(str(s).strip()) != old_norm]
+
+    # rules: remove from if_symptoms
+    for r in kb.get("rules", []):
+        if not isinstance(r, dict):
+            continue
+        s_list = r.get("if_symptoms")
+        if isinstance(s_list, list):
+            r["if_symptoms"] = [str(s).strip() for s in s_list if _normalize_symptom(str(s).strip()) != old_norm]
+
+    return kb
