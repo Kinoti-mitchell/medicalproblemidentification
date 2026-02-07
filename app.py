@@ -147,6 +147,55 @@ def clear_symptom_history() -> None:
 # Export (explanation / Symptom Checker results) — text only
 # -----------------------------------------------------------------------------
 
+def _backward_chain_fallback(disease_id_or_name: str, kb: dict) -> dict | None:
+    """Fallback when engine.backward_chain is missing (e.g. old deploy). Same logic as inference_engine.backward_chain."""
+    if not disease_id_or_name or not isinstance(disease_id_or_name, str):
+        return None
+    key = disease_id_or_name.strip()
+    if not key:
+        return None
+    key_norm = " ".join(key.lower().split())
+    diseases = kb.get("diseases", [])
+    rules = kb.get("rules", [])
+
+    disease_id = None
+    disease_name = None
+    for d in diseases:
+        if not isinstance(d, dict):
+            continue
+        did = d.get("id", "")
+        dname = (d.get("name") or "").strip()
+        if key_norm == " ".join((did or "").lower().split()) or key_norm == " ".join((dname or "").lower().split()):
+            disease_id = did
+            disease_name = dname or did
+            break
+    if not disease_id:
+        return None
+
+    rule_entries = []
+    all_syms = set()
+    for r in rules:
+        if not isinstance(r, dict):
+            continue
+        if (r.get("then_disease_id") or "").strip() != disease_id:
+            continue
+        if_syms = [s.strip() for s in (r.get("if_symptoms") or []) if s and str(s).strip()]
+        for s in if_syms:
+            all_syms.add(s)
+        rule_entries.append({
+            "rule_id": r.get("id", ""),
+            "if_symptoms": if_syms,
+            "confidence": r.get("confidence", 0.5),
+        })
+
+    return {
+        "disease_id": disease_id,
+        "disease_name": disease_name,
+        "rules": rule_entries,
+        "all_symptoms": sorted(all_syms),
+    }
+
+
 def _build_explanation_txt(results: list[dict], user_symptoms: list[str]) -> str:
     """Build a plain-text report of Symptom Checker results (no extra deps)."""
     lines = [
@@ -405,7 +454,10 @@ def page_backward_chaining():
     )
     if not choice:
         return
-    result = engine.backward_chain(choice, kb)
+    backward_chain_fn = getattr(engine, "backward_chain", None)
+    if backward_chain_fn is None:
+        backward_chain_fn = _backward_chain_fallback
+    result = backward_chain_fn(choice, kb)
     if result is None:
         st.warning("Disease not found.")
         return
