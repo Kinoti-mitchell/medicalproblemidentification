@@ -53,6 +53,24 @@ st.markdown("""
         border-radius: 12px; padding: 1rem 1.25rem; margin: 1rem 0; }
     .tip-box .tip-title { font-size: 0.85rem; font-weight: 600; color: #38bdf8; margin-bottom: 0.35rem; }
     .tip-box .tip-text { color: #cbd5e1; font-size: 0.9rem; }
+    .disease-checker-hero { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border: 1px solid #475569;
+        border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+    .disease-checker-hero h3 { margin: 0 0 0.25rem 0; color: #f8fafc; font-size: 1.35rem; }
+    .disease-checker-hero p { margin: 0; color: #94a3b8; font-size: 0.95rem; }
+    .disease-checker-card { background: linear-gradient(145deg, #1e293b 0%, #334155 100%); border: 1px solid #475569;
+        border-radius: 12px; padding: 1rem 1.25rem; margin: 0.75rem 0; }
+    .disease-checker-card .card-title { font-size: 0.8rem; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .disease-checker-card .card-body { color: #e2e8f0; font-size: 0.95rem; }
+    .symptom-pill { display: inline-block; background: #334155; border: 1px solid #475569; color: #e2e8f0;
+        border-radius: 999px; padding: 0.25rem 0.75rem; margin: 0.2rem 0.2rem 0.2rem 0; font-size: 0.85rem; }
+    .rule-card-bc { background: #1e293b; border: 1px solid #475569; border-radius: 10px; padding: 1rem; margin: 0.5rem 0; }
+    .rule-card-bc .rule-id { font-weight: 700; color: #38bdf8; }
+    .rule-card-bc .rule-conf { font-size: 0.8rem; color: #94a3b8; }
+    .rule-card-bc .rule-if { color: #cbd5e1; margin: 0.35rem 0; font-size: 0.9rem; }
+    .rule-card-bc .rule-then { color: #94a3b8; font-size: 0.85rem; }
+    .rule-card-bc .rule-intro { color: #94a3b8; font-size: 0.8rem; margin-bottom: 0.4rem; }
+    .rule-card-bc .rule-symptoms { color: #e2e8f0; margin: 0.25rem 0; font-size: 0.95rem; }
+    .rule-card-bc .rule-outcome { color: #38bdf8; font-size: 0.9rem; margin-top: 0.35rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,8 +144,32 @@ def clear_symptom_history() -> None:
 
 
 # -----------------------------------------------------------------------------
-# Helpers: disease card (no medical logic, display only)
+# Export (explanation / Symptom Checker results) — text only
 # -----------------------------------------------------------------------------
+
+def _build_explanation_txt(results: list[dict], user_symptoms: list[str]) -> str:
+    """Build a plain-text report of Symptom Checker results (no extra deps)."""
+    lines = [
+        "Symptom Checker Results",
+        f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+        "",
+        "Your symptoms: " + ", ".join(user_symptoms) if user_symptoms else "Your symptoms: None",
+        "",
+        "---",
+    ]
+    for r in results:
+        name = r.get("disease_name") or "Unknown"
+        conf = r.get("confidence", 0)
+        lines.append(f"\n{name} (confidence {conf:.0%})")
+        lines.append("Matched symptoms: " + ", ".join(r.get("matched_symptoms", [])))
+        lines.append("Rules that fired:")
+        for fr in r.get("fired_rules", []):
+            lines.append(f"  - Rule {fr.get('rule_id', '')}: matched {fr.get('matched_symptoms', [])} -> confidence {fr.get('rule_confidence', 0):.0%}")
+        lines.append("Explanation: " + (r.get("explanation") or ""))
+        lines.append("")
+    lines.append("\nThis report is for educational use only. It does not replace professional medical advice or diagnosis.")
+    return "\n".join(lines)
+
 
 def render_disease_card(disease: dict, confidence: float | None = None):
     name = disease.get("name") or "Unknown"
@@ -179,15 +221,15 @@ def page_home():
     st.markdown("**What do you want to do?**")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔍 **Disease Search**\n\nFind by name or by a single symptom.", use_container_width=True, key="home_search"):
-            st.session_state.page = "Disease Search"
-            st.rerun()
-        if st.button("🧩 **Symptom Checker**\n\nEnter symptoms; get rule-based suggestions with confidence.", use_container_width=True, key="home_symptom"):
+        if st.button("🧩 **Symptom Checker**\n\nEnter symptoms for possible conditions, or look up diseases by name/symptom.", use_container_width=True, key="home_symptom"):
             st.session_state.page = "Symptom Checker"
             st.rerun()
-    with col2:
         if st.button("📋 **Explanation View**\n\nSee which rules fired and why a condition was suggested.", use_container_width=True, key="home_explanation"):
             st.session_state.page = "Explanation View"
+            st.rerun()
+    with col2:
+        if st.button("🔍 **Disease Checker**\n\nWhat symptoms would suggest a given condition?", use_container_width=True, key="home_disease_checker"):
+            st.session_state.page = "Disease Checker"
             st.rerun()
         if st.button("⚙️ **System Info**\n\nKnowledge version, load time, CPU/memory.", use_container_width=True, key="home_sysinfo"):
             st.session_state.page = "System Info"
@@ -209,44 +251,44 @@ def page_home():
     st.markdown(f'<div class="tip-box"><div class="tip-title">💡 Quick tip</div><div class="tip-text">{tip}</div></div>', unsafe_allow_html=True)
 
 
-def page_disease_search():
-    st.markdown("### 🔍 Disease Search")
-    st.caption("Find conditions by name or by a single symptom.")
+def page_symptom_checker():
+    st.markdown("### 🧩 Symptom Checker")
+    st.caption("Get possible conditions from your symptoms (rule-based), or look up diseases by name or by one symptom.")
     kb = get_kb()
     if kb is None:
         return
-    search_mode = st.radio("Search by", ["Name", "Symptom"], horizontal=True, label_visibility="collapsed")
-    if search_mode == "Name":
-        query = st.text_input("Disease name", placeholder="e.g. Asthma, Migraine", key="name_search")
-        if query:
-            q = query.strip().lower()
-            results = [d for d in kb.get("diseases", []) if d.get("name") and q in d.get("name", "").lower()]
-            if not results:
-                st.info("No diseases found with that name.")
+    mode = st.radio(
+        "What do you want to do?",
+        ["Get possible conditions (enter your symptoms)", "Look up diseases (by name or one symptom)"],
+        horizontal=True,
+        key="symptom_checker_mode",
+    )
+    if mode == "Look up diseases (by name or one symptom)":
+        search_by = st.radio("Search by", ["Name", "Symptom"], horizontal=True, label_visibility="collapsed", key="lookup_by")
+        if search_by == "Name":
+            query = st.text_input("Disease name", placeholder="e.g. Asthma, Migraine", key="name_search")
+            if query:
+                q = query.strip().lower()
+                results = [d for d in kb.get("diseases", []) if d.get("name") and q in d.get("name", "").lower()]
+                if not results:
+                    st.info("No diseases found with that name.")
+                else:
+                    for d in results:
+                        render_disease_card(d)
+        else:
+            all_symptoms = engine.get_all_symptoms_from_kb(kb)
+            if not all_symptoms:
+                st.warning("No symptoms in knowledge base.")
             else:
-                for d in results:
-                    render_disease_card(d)
-    else:
-        all_symptoms = engine.get_all_symptoms_from_kb(kb)
-        if not all_symptoms:
-            st.warning("No symptoms in knowledge base.")
-            return
-        selected = st.selectbox("Select a symptom", options=[""] + all_symptoms, key="symptom_search")
-        if selected:
-            results = [d for d in kb.get("diseases", []) if selected in (d.get("symptoms") or [])]
-            if not results:
-                st.info("No diseases list this symptom.")
-            else:
-                st.success(f"**{selected}** may be associated with {len(results)} condition(s).")
-                for d in results:
-                    render_disease_card(d)
-
-
-def page_symptom_checker():
-    st.markdown("### 🧩 Symptom Checker")
-    st.caption("Enter symptoms; the inference engine matches rules and returns possible conditions with confidence.")
-    kb = get_kb()
-    if kb is None:
+                selected = st.selectbox("Select a symptom", options=[""] + all_symptoms, key="symptom_search")
+                if selected:
+                    results = [d for d in kb.get("diseases", []) if selected in (d.get("symptoms") or [])]
+                    if not results:
+                        st.info("No diseases list this symptom.")
+                    else:
+                        st.success(f"**{selected}** may be associated with {len(results)} condition(s).")
+                        for d in results:
+                            render_disease_card(d)
         return
     all_symptoms = engine.get_all_symptoms_from_kb(kb)
     input_method = st.radio(
@@ -276,12 +318,34 @@ def page_symptom_checker():
                 st.info("No rules matched these symptoms. Try different or additional symptoms.")
             else:
                 st.success(f"**{len(results)}** possible condition(s) from rule matching.")
+                txt_content = _build_explanation_txt(results, list(symptoms))
+                st.download_button(
+                    "📥 Export results as text",
+                    data=txt_content,
+                    file_name=f"symptom-checker-results-{datetime.utcnow().strftime('%Y%m%d-%H%M')}.txt",
+                    mime="text/plain",
+                    key="export_symptom_checker_txt",
+                )
                 for r in results:
                     disease = engine.get_disease_by_id(r["disease_id"], kb)
                     if disease:
                         render_disease_card(disease, confidence=r["confidence"])
                         with st.expander("Why was this suggested?"):
                             st.write(r.get("explanation", ""))
+    else:
+        last_results = st.session_state.get("last_inference_result", [])
+        last_symptoms = st.session_state.get("last_user_symptoms", [])
+        if last_results and last_symptoms:
+            st.markdown("---")
+            st.markdown("**Last check result** — export or run a new check above.")
+            txt_content = _build_explanation_txt(last_results, last_symptoms)
+            st.download_button(
+                "📥 Export last result as text",
+                data=txt_content,
+                file_name=f"symptom-checker-results-{datetime.utcnow().strftime('%Y%m%d-%H%M')}.txt",
+                mime="text/plain",
+                key="export_symptom_checker_txt_last",
+            )
 
 
 def page_explanation_view():
@@ -295,6 +359,14 @@ def page_explanation_view():
     if not results:
         st.info("Run **Symptom Checker** first to see explanations for recommendations.")
         return
+    txt_content = _build_explanation_txt(results, user_symptoms)
+    st.download_button(
+        "📥 Export as text",
+        data=txt_content,
+        file_name=f"symptom-checker-results-{datetime.utcnow().strftime('%Y%m%d-%H%M')}.txt",
+        mime="text/plain",
+        key="export_explanation_txt",
+    )
     st.markdown(f"**Your symptoms:** {', '.join(user_symptoms)}")
     st.markdown("---")
     for r in results:
@@ -305,6 +377,65 @@ def page_explanation_view():
             st.write(f"- Rule **{fr.get('rule_id', '')}**: matched {fr.get('matched_symptoms', [])} → confidence {fr.get('rule_confidence', 0):.0%}")
         st.markdown("**Explanation:** " + (r.get("explanation") or ""))
         st.markdown("---")
+
+
+def page_backward_chaining():
+    kb = get_kb()
+    if kb is None:
+        return
+    st.markdown("### 🔍 Disease Checker")
+    st.markdown(
+        '<div class="disease-checker-hero">'
+        '<h3>What symptoms would suggest this condition?</h3>'
+        '<p>Select a disease below. You’ll see which symptoms (from the rule base) support that condition — this is <strong>backward chaining</strong>.</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    diseases = kb.get("diseases", [])
+    if not diseases:
+        st.warning("No diseases in the knowledge base. Add some in **Manage**.")
+        return
+    disease_options = [(d.get("id", ""), (d.get("name") or "Unnamed").strip()) for d in diseases]
+    choice = st.selectbox(
+        "**Select a condition**",
+        options=[did for did, _ in disease_options],
+        format_func=lambda x: next((n for i, n in disease_options if i == x), x),
+        key="backward_disease_choice",
+        placeholder="Choose a disease…",
+    )
+    if not choice:
+        return
+    result = engine.backward_chain(choice, kb)
+    if result is None:
+        st.warning("Disease not found.")
+        return
+    disease_name = result["disease_name"]
+    disease_record = engine.get_disease_by_id(choice, kb)
+    st.markdown("---")
+    st.markdown(f"#### {disease_name}")
+    if disease_record and (disease_record.get("description") or "").strip():
+        st.caption((disease_record.get("description") or "").strip())
+    st.markdown("")
+    if not result["all_symptoms"]:
+        st.info("No rules conclude this disease yet. Add rules in **Manage → Rules** that have this condition as **THEN** to see which symptoms suggest it.")
+        return
+    st.markdown("**Symptoms that suggest this condition** (from rules)")
+    pills_html = " ".join(f'<span class="symptom-pill">{s}</span>' for s in result["all_symptoms"])
+    st.markdown(f'<div class="disease-checker-card"><div class="card-title">Associated symptoms</div><div class="card-body">{pills_html}</div></div>', unsafe_allow_html=True)
+    st.markdown("**How the system links symptoms to this condition**")
+    for re in result.get("rules", []):
+        rule_id = re.get("rule_id", "")
+        conf = re.get("confidence", 0)
+        if_syms = re.get("if_symptoms", [])
+        if_str = ", ".join(if_syms) if if_syms else "—"
+        st.markdown(
+            f'<div class="rule-card-bc">'
+            f'<span class="rule-id">{rule_id}</span> <span class="rule-conf">(confidence {conf:.0%})</span><br>'
+            f'<span class="rule-if"><strong>IF</strong> {if_str}</span><br>'
+            f'<span class="rule-then"><strong>THEN</strong> → {disease_name}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def page_manage_diseases():
@@ -578,14 +709,14 @@ with st.sidebar:
     if st.button(("🏠 Home" + (" ✓" if cur == "Home" else "")), use_container_width=True, key="nav_home", type="primary" if cur == "Home" else "secondary"):
         st.session_state.page = "Home"
         st.rerun()
-    if st.button(("🔍 Disease Search" + (" ✓" if cur == "Disease Search" else "")), use_container_width=True, key="nav_search", type="primary" if cur == "Disease Search" else "secondary"):
-        st.session_state.page = "Disease Search"
-        st.rerun()
     if st.button(("🧩 Symptom Checker" + (" ✓" if cur == "Symptom Checker" else "")), use_container_width=True, key="nav_symptom", type="primary" if cur == "Symptom Checker" else "secondary"):
         st.session_state.page = "Symptom Checker"
         st.rerun()
     if st.button(("📋 Explanation View" + (" ✓" if cur == "Explanation View" else "")), use_container_width=True, key="nav_explanation", type="primary" if cur == "Explanation View" else "secondary"):
         st.session_state.page = "Explanation View"
+        st.rerun()
+    if st.button(("🔍 Disease Checker" + (" ✓" if cur == "Disease Checker" else "")), use_container_width=True, key="nav_disease_checker", type="primary" if cur == "Disease Checker" else "secondary"):
+        st.session_state.page = "Disease Checker"
         st.rerun()
     if st.button(("✏️ Manage" + (" ✓" if cur == "Manage Diseases" else "")), use_container_width=True, key="nav_manage", type="primary" if cur == "Manage Diseases" else "secondary"):
         st.session_state.page = "Manage Diseases"
@@ -604,12 +735,12 @@ with st.sidebar:
 
 if st.session_state.page == "Home":
     page_home()
-elif st.session_state.page == "Disease Search":
-    page_disease_search()
 elif st.session_state.page == "Symptom Checker":
     page_symptom_checker()
 elif st.session_state.page == "Explanation View":
     page_explanation_view()
+elif st.session_state.page == "Disease Checker":
+    page_backward_chaining()
 elif st.session_state.page == "Manage Diseases":
     page_manage_diseases()
 elif st.session_state.page == "Symptom History":

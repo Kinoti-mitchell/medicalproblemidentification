@@ -128,3 +128,66 @@ def get_all_symptoms_from_kb(kb: dict) -> list[str]:
             if t:
                 seen.add(t)
     return sorted(seen)
+
+
+# -----------------------------------------------------------------------------
+# Backward chaining: given a disease, find which symptoms (from rules) suggest it
+# -----------------------------------------------------------------------------
+
+
+def backward_chain(disease_id_or_name: str, kb: dict) -> dict | None:
+    """
+    Backward chaining: given a disease (id or name), find all rules that conclude
+    that disease and return their IF symptoms. Answers: "What symptoms would
+    suggest this condition?"
+
+    Returns a dict with disease_id, disease_name, rules (list of { rule_id, if_symptoms, confidence }),
+    and all_symptoms (unique sorted list of all symptoms from those rules), or None if disease not found.
+    """
+    if not disease_id_or_name or not isinstance(disease_id_or_name, str):
+        return None
+    key = disease_id_or_name.strip()
+    if not key:
+        return None
+    key_norm = _normalize(key)
+    diseases = kb.get("diseases", [])
+    rules = kb.get("rules", [])
+
+    # Resolve disease by id or name
+    disease_id = None
+    disease_name = None
+    for d in diseases:
+        if not isinstance(d, dict):
+            continue
+        did = d.get("id", "")
+        dname = (d.get("name") or "").strip()
+        if key_norm == _normalize(did) or key_norm == _normalize(dname):
+            disease_id = did
+            disease_name = dname or did
+            break
+    if not disease_id:
+        return None
+
+    # All rules that conclude this disease
+    rule_entries = []
+    all_syms: set[str] = set()
+    for r in rules:
+        if not isinstance(r, dict):
+            continue
+        if (r.get("then_disease_id") or "").strip() != disease_id:
+            continue
+        if_syms = [s.strip() for s in (r.get("if_symptoms") or []) if s and str(s).strip()]
+        for s in if_syms:
+            all_syms.add(s)
+        rule_entries.append({
+            "rule_id": r.get("id", ""),
+            "if_symptoms": if_syms,
+            "confidence": r.get("confidence", 0.5),
+        })
+
+    return {
+        "disease_id": disease_id,
+        "disease_name": disease_name,
+        "rules": rule_entries,
+        "all_symptoms": sorted(all_syms),
+    }

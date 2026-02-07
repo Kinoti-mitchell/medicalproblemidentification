@@ -20,16 +20,16 @@ Use this for your lecturer presentation: project basics and answers to common qu
 
 ### Main features (show in the app)
 1. **Home** — Overview, stats (diseases, symptoms, “searches you can run”), quick links.  
-2. **Disease Search** — Find conditions by **name** or by **one symptom** (which diseases list that symptom).  
-3. **Symptom Checker** — User enters **multiple symptoms** → system matches rules (forward chaining) → shows possible conditions with **confidence** and **explanation** (which rules fired, which symptoms matched).  
-4. **Explanation View** — Shows last Symptom Checker result: which rules fired and why each condition was suggested.  
+2. **Symptom Checker** — Two modes: (1) **Get possible conditions** — enter multiple symptoms → forward chaining → possible diseases with confidence and explanation; (2) **Look up diseases** — by name or by one symptom (which diseases list that symptom).  
+3. **Explanation View** — Shows last Symptom Checker result (rule-based): which rules fired and why each condition was suggested. **Export as text** to download the report.  
+4. **Disease Checker** — Pick a condition; see which symptoms (from rules) would suggest it (“What symptoms would support this condition?”). Uses **backward chaining**. UI: hero intro, symptom pills, and a “How the system links symptoms to this condition” section with rule cards (IF/THEN and confidence) in plain language.  
 5. **Manage** — Three tabs: **Symptoms** (add/edit/delete symptoms; renames sync to diseases and rules), **Diseases** (add/edit/delete diseases), **Rules** (add with auto rule ID, edit, delete IF–THEN rules). All saved to JSON.  
 6. **Symptom History** — Most asked symptoms (counts) and recent searches; can clear history.  
 7. **System Info** — Knowledge base version, load time, validation status; CPU/memory if psutil is installed.
 
 ### Architecture (important for KBS)
 - **Knowledge (data):** In JSON — **facts.symptoms** (managed symptom list), **diseases** (name, description, symptoms, diagnostics, treatment, references), and **rules** (id, if_symptoms, then_disease_id, confidence).  
-- **Reasoning (logic):** In Python — **inference_engine.py** does forward chaining (match user symptoms to rules, compute confidence, build explanations).  
+- **Reasoning (logic):** In Python — **inference_engine.py** does **forward chaining** (symptoms → possible diseases) and **backward chaining** (disease → which symptoms suggest it).  
 - **Separation:** UI (**app.py**) does not contain medical logic; it only calls the inference engine and displays results.  
 - **Validation:** **knowledge_loader.py** loads JSON, checks schema, duplicate rules, conflicting conclusions, and invalid disease references.  
 - **Manage:** Symptoms, diseases, and rules are edited via the Manage page (tabs); rule IDs are auto-generated when adding rules.
@@ -80,12 +80,10 @@ Use this for your lecturer presentation: project basics and answers to common qu
 
 ### “What could you add in the future?”
 - **More diseases, rules, and symptoms** in the JSON for broader coverage.  
-- **Backward chaining** (e.g. “What symptoms would suggest disease X?”).  
-- **Export** — e.g. export results or explanation as PDF.  
 - **User accounts and cloud storage** if the project were to scale.
 
 ### “How do you run the project?”
-- Create and activate .venv, run `pip install -r requirements.txt`, then `streamlit run app.py` from the project root.  
+- Create and activate .venv (if you use one), run `pip install -r requirements.txt`, then `streamlit run app.py` from the project root. On Windows you can use `py -m streamlit run app.py` so the same Python runs the app.  
 - Open the URL shown (e.g. http://localhost:8501).  
 - The app loads `data/knowledge_base.json` at startup; no database setup.
 
@@ -96,7 +94,7 @@ Use this for your lecturer presentation: project basics and answers to common qu
 
 ## 3. One-minute summary (elevator pitch)
 
-*“I built a Medical Knowledge-Based System in Python and Streamlit. The knowledge is stored as IF–THEN rules in JSON, along with a managed list of symptoms and diseases. When a user enters symptoms, the inference engine uses forward chaining to find matching rules and suggests possible conditions with a confidence score. Each suggestion can be explained: which rules fired and which symptoms matched. The app lets you search diseases by name or symptom, manage symptoms and diseases and rules from one page with tabs, and view symptom search history. The system is read-only in terms of diagnosis — it’s for education and exploration, not to replace a doctor.”*
+*“I built a Medical Knowledge-Based System in Python and Streamlit. The knowledge is stored as IF–THEN rules in JSON, along with a managed list of symptoms and diseases. The Symptom Checker does two things: you can enter symptoms to get possible conditions (forward chaining with confidence), or look up diseases by name or by one symptom. You can export the results and explanations as a text file. The Disease Checker uses backward chaining: pick a disease and see which symptoms would suggest it. You can manage symptoms, diseases, and rules from one page and view symptom search history. The system is for education and exploration, not to replace a doctor.”*
 
 ---
 
