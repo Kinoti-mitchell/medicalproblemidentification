@@ -58,17 +58,6 @@ st.markdown("""
 
 
 # -----------------------------------------------------------------------------
-# Global medical disclaimer (KBS: ethical and legal safety)
-# -----------------------------------------------------------------------------
-
-def render_global_disclaimer():
-    st.markdown(
-        "**This system provides educational medical knowledge and does not replace professional medical judgment.**"
-    )
-    st.markdown("---")
-
-
-# -----------------------------------------------------------------------------
 # Load knowledge once; fail gracefully with message
 # -----------------------------------------------------------------------------
 
@@ -175,7 +164,6 @@ def render_disease_card(disease: dict, confidence: float | None = None):
 def page_home():
     st.markdown('<p class="hero-title">🩺 Medical Knowledge System</p>', unsafe_allow_html=True)
     st.markdown('<p class="hero-tagline">Search conditions by name or symptom, explore possible diagnoses, and manage the knowledge base — all in one place.</p>', unsafe_allow_html=True)
-    render_global_disclaimer()
     kb = get_kb()
     if kb is None:
         return
@@ -224,7 +212,6 @@ def page_home():
 def page_disease_search():
     st.markdown("### 🔍 Disease Search")
     st.caption("Find conditions by name or by a single symptom.")
-    render_global_disclaimer()
     kb = get_kb()
     if kb is None:
         return
@@ -258,7 +245,6 @@ def page_disease_search():
 def page_symptom_checker():
     st.markdown("### 🧩 Symptom Checker")
     st.caption("Enter symptoms; the inference engine matches rules and returns possible conditions with confidence.")
-    render_global_disclaimer()
     kb = get_kb()
     if kb is None:
         return
@@ -301,7 +287,6 @@ def page_symptom_checker():
 def page_explanation_view():
     st.markdown("### 📋 Explanation View")
     st.caption("See which rules fired and which symptoms matched for each recommendation.")
-    render_global_disclaimer()
     kb = get_kb()
     if kb is None:
         return
@@ -325,7 +310,6 @@ def page_explanation_view():
 def page_manage_diseases():
     st.markdown("### ✏️ Manage Diseases")
     st.caption("Add new diseases or edit existing ones in the knowledge base. Changes are saved to data/knowledge_base.json.")
-    render_global_disclaimer()
     kb = get_kb()
     if kb is None:
         return
@@ -398,7 +382,6 @@ def page_manage_diseases():
 def page_symptom_history():
     st.markdown("### 📊 Symptom History")
     st.caption("Most asked symptoms and recent symptom checks. Manage or clear history below.")
-    render_global_disclaimer()
     data = _load_symptom_history()
     counts = data.get("symptom_counts", {})
     recent = data.get("recent_searches", [])
@@ -428,7 +411,6 @@ def page_symptom_history():
 
 def page_system_info():
     st.markdown("### ⚙️ System Info")
-    render_global_disclaimer()
     info = loader.get_load_info()
     st.markdown("**Knowledge base**")
     st.write(f"- Version: {info['knowledge_version']}")
